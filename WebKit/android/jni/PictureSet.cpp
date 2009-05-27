@@ -23,7 +23,6 @@
  * OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-#define LOG_NDEBUG 0
 #define LOG_TAG "pictureset"
 
 //#include <config.h>
