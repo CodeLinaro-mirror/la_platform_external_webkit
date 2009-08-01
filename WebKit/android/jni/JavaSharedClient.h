@@ -30,15 +30,18 @@ namespace android {
 
     class TimerClient;
     class CookieClient;
+    class KeyGeneratorClient;
 
     class JavaSharedClient
     {
     public:
         static TimerClient* GetTimerClient(); 
         static CookieClient* GetCookieClient();
+        static KeyGeneratorClient* GetKeyGeneratorClient();
 
         static void SetTimerClient(TimerClient* client);
         static void SetCookieClient(CookieClient* client);
+        static void SetKeyGeneratorClient(KeyGeneratorClient* client);
 
         // can be called from any thread, to be executed in webkit thread
         static void EnqueueFunctionPtr(void (*proc)(void*), void* payload);
@@ -48,6 +51,7 @@ namespace android {
     private:
         static TimerClient* gTimerClient;
         static CookieClient* gCookieClient;
+        static KeyGeneratorClient* gKeyGeneratorClient;
     };
 }
 #endif
