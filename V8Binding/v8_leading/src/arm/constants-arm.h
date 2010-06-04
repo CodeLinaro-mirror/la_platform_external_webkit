@@ -72,6 +72,10 @@
 # define CAN_USE_THUMB_INSTRUCTIONS 1
 #endif
 
+#if CAN_USE_UNALIGNED_ACCESSES
+#define V8_TARGET_CAN_READ_UNALIGNED 1
+#endif
+
 namespace assembler {
 namespace arm {
 

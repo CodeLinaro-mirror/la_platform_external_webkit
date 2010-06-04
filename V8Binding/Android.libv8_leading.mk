@@ -64,7 +64,10 @@ LOCAL_CFLAGS += \
 	-Wno-endif-labels \
 	-Wno-import \
 	-Wno-format \
-	-fno-exceptions
+	-fno-exceptions \
+	-O3 \
+	-DV8_NATIVE_REGEXP \
+	-DCAN_USE_UNALIGNED_ACCESSES
 
 ifeq ($(TARGET_ARCH),arm)
 	LOCAL_CFLAGS += -DARM -DV8_TARGET_ARCH_ARM

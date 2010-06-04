@@ -214,6 +214,10 @@
 /* Currently Chromium is the only platform which uses V8 by default */
 #if PLATFORM(CHROMIUM)
 #define WTF_USE_V8 1
+#elif PLATFORM(ANDROID)
+#if USE_ALT_JS_ENGINE
+#define WTF_USE_V8 1
+#endif
 #else
 #define WTF_USE_V8 0
 #endif /* PLATFORM(CHROMIUM) */
