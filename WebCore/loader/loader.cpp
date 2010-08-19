@@ -40,6 +40,11 @@
 #include "SubresourceLoader.h"
 #include <wtf/Assertions.h>
 #include <wtf/Vector.h>
+#include <wtf/HashSet.h>
+#include "DNS.h"
+
+#define PRIORITY_MAXIMUM (800 + 480)
+#define SCROLL_REORDER_THRESHOLD 50
 
 #define REQUEST_MANAGEMENT_ENABLED 1
 #define REQUEST_DEBUG 0
@@ -131,6 +136,7 @@ void Loader::load(DocLoader* docLoader, CachedResource* resource, bool increment
         if (!host) {
             host = Host::create(hostName, maxRequestsInFlightPerHost);
             m_hosts.add(hostName.impl(), host);
+            prefetchDNS(url.host(), docLoader->frame(), DnsPrefetchResource);
         }
     } else 
         host = m_nonHTTPProtocolHost;
