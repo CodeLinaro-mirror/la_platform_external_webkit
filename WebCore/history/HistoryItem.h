@@ -1,5 +1,6 @@
 /*
  * Copyright (C) 2006, 2008 Apple Inc. All rights reserved.
+ * Copyright (c) 2011, Code Aurora Forum. All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions
@@ -200,6 +201,13 @@ public:
     const Vector<int>& dailyVisitCounts() const { return m_dailyVisitCounts; }
     const Vector<int>& weeklyVisitCounts() const { return m_weeklyVisitCounts; }
 
+    Element* headerDIV() const { return m_headerDIV; }
+    void setHeaderDIV(Element* headerDIV) { m_headerDIV = headerDIV; }
+    RenderView* contentRenderer() const { return m_contentRenderer; }
+    void setContentRenderer(RenderView* renderView) { m_contentRenderer = renderView; }
+    bool shouldPaintHeader() const { return m_shouldPaintHeader; }
+    void setShouldPaintHeader(bool shouldPaintHeader) { m_shouldPaintHeader = shouldPaintHeader; }
+
 private:
     HistoryItem();
     HistoryItem(const String& urlString, const String& title, double lastVisited);
@@ -267,6 +275,10 @@ private:
 #if PLATFORM(ANDROID)
     RefPtr<AndroidWebHistoryBridge> m_bridge;
 #endif
+
+    Element* m_headerDIV;
+    RenderView* m_contentRenderer;
+    bool m_shouldPaintHeader;
 
 }; //class HistoryItem
 
