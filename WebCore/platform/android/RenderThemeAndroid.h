@@ -49,9 +49,9 @@ class RenderThemeAndroid : public RenderTheme {
 public:
     static PassRefPtr<RenderTheme> create();
     ~RenderThemeAndroid();
-    
+
     virtual bool stateChanged(RenderObject*, ControlState) const;
-       
+
     virtual bool supportsFocusRing(const RenderStyle*) const;
     // A method asking if the theme's controls actually care about redrawing when hovered.
     virtual bool supportsHover(const RenderStyle* style) const { return style->affectedByHoverRules(); }
@@ -79,15 +79,17 @@ protected:
 
 #if ENABLE(VIDEO)
     virtual String extraMediaControlsStyleSheet();
-    virtual void adjustSliderThumbSize(RenderObject* o) const;
-    virtual bool shouldRenderMediaControlPart(ControlPart part, Element* e);
-    bool paintMediaMuteButton(RenderObject* o, const RenderObject::PaintInfo& paintInfo, const IntRect& r);
-    bool paintMediaPlayButton(RenderObject* o, const RenderObject::PaintInfo& paintInfo, const IntRect& r);
-    bool paintMediaSeekBackButton(RenderObject* o, const RenderObject::PaintInfo& paintInfo, const IntRect& r);
-    bool paintMediaSeekForwardButton(RenderObject* o, const RenderObject::PaintInfo& paintInfo, const IntRect& r);
-    bool paintMediaSliderTrack(RenderObject* o, const RenderObject::PaintInfo& paintInfo, const IntRect& r);
-    bool paintMediaSliderThumb(RenderObject* o, const RenderObject::PaintInfo& paintInfo, const IntRect& r);
-    virtual bool paintMediaControlsBackground(RenderObject* object, const RenderObject::PaintInfo& paintInfo, const IntRect& rect);
+    virtual bool shouldRenderMediaControlPart(ControlPart, Element*);
+    virtual void adjustSliderThumbSize(RenderObject*) const;
+
+    virtual bool paintMediaControlsBackground(RenderObject*, const RenderObject::PaintInfo&, const IntRect&);
+    virtual bool paintMediaFullscreenButton(RenderObject*, const RenderObject::PaintInfo&, const IntRect&);
+    virtual bool paintMediaMuteButton(RenderObject*, const RenderObject::PaintInfo&, const IntRect&);
+    virtual bool paintMediaPlayButton(RenderObject*, const RenderObject::PaintInfo&, const IntRect&);
+    virtual bool paintMediaSliderThumb(RenderObject*, const RenderObject::PaintInfo&, const IntRect&);
+    virtual bool paintMediaSliderTrack(RenderObject*, const RenderObject::PaintInfo&, const IntRect&);
+    virtual bool paintMediaVolumeSliderThumb(RenderObject*, const RenderObject::PaintInfo&, const IntRect&);
+    virtual bool paintMediaVolumeSliderTrack(RenderObject*, const RenderObject::PaintInfo&, const IntRect&);
 #endif
 
     virtual bool paintRadio(RenderObject*, const RenderObject::PaintInfo&, const IntRect&);
@@ -101,7 +103,7 @@ protected:
 
     virtual void adjustTextAreaStyle(CSSStyleSelector*, RenderStyle*, WebCore::Element*) const;
     virtual bool paintTextArea(RenderObject*, const RenderObject::PaintInfo&, const IntRect&);
-    
+
     bool paintCombo(RenderObject*, const RenderObject::PaintInfo&,  const IntRect&);
 
     virtual void adjustListboxStyle(CSSStyleSelector*, RenderStyle*, Element*) const;
@@ -110,7 +112,7 @@ protected:
 
     virtual void adjustMenuListButtonStyle(CSSStyleSelector*, RenderStyle*, Element*) const;
     virtual bool paintMenuListButton(RenderObject*, const RenderObject::PaintInfo&, const IntRect&);
-    
+
     virtual void adjustSearchFieldStyle(CSSStyleSelector*, RenderStyle*, Element*) const;
     virtual bool paintSearchField(RenderObject*, const RenderObject::PaintInfo&, const IntRect&);
 

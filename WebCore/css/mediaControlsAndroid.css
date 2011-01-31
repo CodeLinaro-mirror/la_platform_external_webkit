@@ -1,5 +1,6 @@
 /*
  * Copyright 2010, The Android Open Source Project
+ * Copyright (c) 2011, Code Aurora Forum. All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions
@@ -26,109 +27,131 @@
 /* media controls */
 
 audio {
-    width: 200px;
-    height: 32px;
+    width: 300px;
+    height: 25px;
 }
 
 audio::-webkit-media-controls-panel, video::-webkit-media-controls-panel {
-    display: -webkit-box;
-    -webkit-box-orient: horizontal;
-    -webkit-box-align: center;
-    -webkit-user-select: none;
-    position: absolute;
-    bottom: 0;
-    width: 100%;
-    z-index: 0;
-    overflow: hidden;
-    height: 32px;
-    text-align: right;
+    -webkit-appearance: media-controls-background;
+    background-color: rgba(0, 0, 0, 0.6);
+    height: 25px;
 }
 
 video:-webkit-full-page-media::-webkit-media-controls-panel {
-    bottom: -32px;
+    bottom: -25px;
 }
 
 audio::-webkit-media-controls-mute-button, video::-webkit-media-controls-mute-button {
-    -webkit-appearance: media-mute-button;
-    display: -webkit-box;
-    width: 32px;
-    height: 32px;
+    -webkit-box-ordinal-group: 2; /* Before the fullscreen button */
+    width: 15px;
+    height: 14px;
+    margin-left: 2px;
+    margin-right: 8px;
 }
 
 audio::-webkit-media-controls-play-button, video::-webkit-media-controls-play-button {
-    -webkit-appearance: media-play-button;
-    display: -webkit-box;
-    width: 32px;
-    height: 32px;
+    width: 16px;
+    height: 16px;
+    margin-left: 6px;
+    margin-right: 1px;
 }
 
 audio::-webkit-media-controls-timeline-container, video::-webkit-media-controls-timeline-container {
-    -webkit-appearance: media-controls-background;
-    display: -webkit-box;
+    -webkit-appearance: none;
     -webkit-box-orient: horizontal;
     -webkit-box-align: center;
-    -webkit-box-pack: end;
+    -webkit-box-pack: center;
     -webkit-box-flex: 1;
-    -webkit-user-select: none;
-    height: 32px;
+    text-align: right;
+    height: auto;
 }
 
 audio::-webkit-media-controls-current-time-display, video::-webkit-media-controls-current-time-display {
-    display: none;
+    -webkit-user-select: none;
+    display: -webkit-box;
+    -webkit-box-flex: 0;
+    -webkit-box-pack: center;
+    -webkit-box-align: center;
+    cursor: default;
+    font: -webkit-small-control;
+    font-size: 9px;
+    margin-top: 3px;
+    overflow: hidden;
+    width: 45px;
+    color: white;
+    text-shadow: black 0px 1px 1px;
+
+    letter-spacing: normal;
+    word-spacing: normal;
+    line-height: normal;
+    text-transform: none;
+    text-indent: 0;
+    text-decoration: none;
 }
 
 audio::-webkit-media-controls-time-remaining-display, video::-webkit-media-controls-time-remaining-display {
-    display: none;
+    -webkit-user-select: none;
+    display: -webkit-box;
+    -webkit-box-flex: 0;
+    -webkit-box-pack: center;
+    -webkit-box-align: center;
+    cursor: default;
+    font: -webkit-small-control;
+    font-size: 9px;
+    margin-top: 3px;
+    overflow: hidden;
+    width: 45px;
+    color: white;
+    text-shadow: black 0px 1px 1px;
+
+    letter-spacing: normal;
+    word-spacing: normal;
+    line-height: normal;
+    text-transform: none;
+    text-indent: 0;
+    text-decoration: none;
 }
 
 audio::-webkit-media-controls-timeline, video::-webkit-media-controls-timeline {
-    -webkit-appearance: media-slider;
     display: -webkit-box;
     -webkit-box-flex: 1;
-    height: 32px;
-    padding: 0px 2px;
-}
+    height: 13px;
+    padding: 0px;
+    margin: 0px;
+    margin-top: 2px;
 
-audio::-webkit-media-controls-volume-slider-container, video::-webkit-media-controls-volume-slider-container {
-    display: none;
-}
-
-audio::-webkit-media-controls-volume-slider, video::-webkit-media-controls-volume-slider {
-    display: none;
+    border-color: rgba(255, 255, 255, 0.2);
+    border-style: solid;
+    border-width: 1px;
+    border-radius: 2px;
+    background-color: rgba(255, 255, 255, 0.08);
+    color: rgb(50, 140, 223);
 }
 
 audio::-webkit-media-controls-seek-back-button, video::-webkit-media-controls-seek-back-button {
-    -webkit-appearance: media-seek-back-button;
-    display: -webkit-box;
-    width: 32px;
-    height: 32px;
+    display: none;
+    width: 0px;
 }
 
 audio::-webkit-media-controls-seek-forward-button, video::-webkit-media-controls-seek-forward-button {
-    -webkit-appearance: media-seek-forward-button;
-    display: -webkit-box;
-    width: 32px;
-    height: 32px;
+    display: none;
+    width: 0px;
 }
 
 audio::-webkit-media-controls-fullscreen-button, video::-webkit-media-controls-fullscreen-button {
-    -webkit-appearance: media-fullscreen-button;
-    display: -webkit-box;
-    width: 32px;
-    height: 32px;
+    width: 16px;
+    height: 16px;
+    margin-left: 7px;
+    margin-right: 7px;
+    -webkit-box-ordinal-group: 4; /* At the very end */
 }
 
 audio::-webkit-media-controls-rewind-button, video::-webkit-media-controls-rewind-button {
-    display: none;
-}
-
-audio::-webkit-media-controls-return-to-realtime-button, video::-webkit-media-controls-return-to-realtime-button {
-    display: none;
-}
-
-audio::-webkit-media-controls-toggle-closed-captions-button, video::-webkit-media-controls-toggle-closed-captions-button {
-    -webkit-appearance: media-toggle-closed-captions-button;
     display: -webkit-box;
-    width: 32px;
-    height: 32px
+    -webkit-appearance: media-rewind-button;
+    width: 18px;
+    height: 18px;
+    margin-bottom: 1px;
+    margin-left: 6px;
+    margin-right: 2px;
 }
