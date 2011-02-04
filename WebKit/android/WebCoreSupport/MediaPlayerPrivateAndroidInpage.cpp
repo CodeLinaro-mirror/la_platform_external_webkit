@@ -50,6 +50,7 @@
 #include "OMX_Video.h"
 #include "PassOwnPtr.h"
 #include "PassRefPtr.h"
+#include "PlatformBridge.h"
 #include "PlatformGraphicsContext.h"
 #include "PlatformString.h"
 #include "SkBitmap.h"
@@ -68,8 +69,10 @@
 #include "media/stagefright/MediaErrors.h"
 #include "ui/PixelFormat.h"
 #include "utils/Errors.h"
+#include "utils/KeyedVector.h"
 #include "utils/RefBase.h"
 #include "utils/String16.h"
+#include "utils/String8.h"
 
 using namespace WTF;
 
@@ -155,7 +158,13 @@ MediaPlayerPrivateAndroidInpage::~MediaPlayerPrivateAndroidInpage()
 
 void MediaPlayerPrivateAndroidInpage::load(const String& url)
 {
-    CHECK_NETWORK_STATE(m_mp->setDataSource(url.utf8().data(), 0)); // TODO pass in proper HTTP header
+    String cookie = PlatformBridge::cookies(KURL(ParsedURLString, url));
+
+    android::KeyedVector<android::String8, android::String8> headers;
+    if (!cookie.isEmpty())
+        headers.add(android::String8("Cookie"), android::String8(cookie.utf8().data()));
+
+    CHECK_NETWORK_STATE(m_mp->setDataSource(url.utf8().data(), &headers));
     CHECK_NETWORK_STATE(m_mp->setListener(WebCoreMediaPlayerListener::create(this)));
 
     // TODO Should query the media player for this.
