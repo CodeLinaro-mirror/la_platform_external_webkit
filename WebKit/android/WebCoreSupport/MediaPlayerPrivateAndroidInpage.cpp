@@ -39,6 +39,9 @@
 #include "CString.h"
 #include "CurrentTime.h"
 #include "GraphicsContext.h"
+#if USE(ACCELERATED_COMPOSITING)
+#include "GraphicsLayer.h"
+#endif
 #include "HTMLVideoElement.h"
 #include "HashSet.h"
 #include "IntRect.h"
@@ -188,6 +191,10 @@ void MediaPlayerPrivateAndroidInpage::load(const String& url)
 
     registerHeap(false);
     m_mp->prepareAsync();
+
+#if USE(ACCELERATED_COMPOSITING)
+    setDrawsContent();
+#endif
 }
 
 void MediaPlayerPrivateAndroidInpage::cancelLoad()
@@ -363,6 +370,13 @@ bool MediaPlayerPrivateAndroidInpage::hasAvailableVideoFrame() const
     return !m_shouldShowPoster && m_readyState >= MediaPlayer::HaveCurrentData;
 }
 
+#if USE(ACCELERATED_COMPOSITING)
+void MediaPlayerPrivateAndroidInpage::acceleratedRenderingStateChanged()
+{
+    setDrawsContent();
+}
+#endif
+
 MediaPlayerPrivateAndroidInpage::MediaPlayerPrivateAndroidInpage(MediaPlayer* player)
     : m_timer(this, &MediaPlayerPrivateAndroidInpage::timerFired)
     , m_player(player)
@@ -425,6 +439,9 @@ void MediaPlayerPrivateAndroidInpage::onMediaPrepared(MessagePacket* messagePtr)
         seek(m_seekTime);
 
     m_player->repaint();
+#if USE(ACCELERATED_COMPOSITING)
+    setDrawsContent();
+#endif
 }
 
 void MediaPlayerPrivateAndroidInpage::onMediaPlaybackComplete(MessagePacket* messagePtr)
@@ -529,6 +546,9 @@ void MediaPlayerPrivateAndroidInpage::onMediaBufferReady(MessagePacket* messageP
             sendFrameToMediaPlayer(frame);
         }
         m_player->repaint();
+#if USE(ACCELERATED_COMPOSITING)
+        setDrawsContent();
+#endif
     }
 
     m_frameQueue.append(messagePtr->ext1());
@@ -686,6 +706,15 @@ void MediaPlayerPrivateAndroidInpage::yuvToRGBFrame(char* yuvFrame, char* rgbFra
                             m_width,
                             m_height);
 }
+
+#if USE(ACCELERATED_COMPOSITING)
+void MediaPlayerPrivateAndroidInpage::setDrawsContent()
+{
+    GraphicsLayer* videoGraphicsLayer = m_player->mediaPlayerClient()->mediaPlayerGraphicsLayer(m_player);
+    if (videoGraphicsLayer)
+        videoGraphicsLayer->setDrawsContent(true);
+}
+#endif
 
 android::sp<MediaPlayerPrivateAndroidInpage::WebCoreMediaPlayerListener> MediaPlayerPrivateAndroidInpage::WebCoreMediaPlayerListener::create(MediaPlayerPrivateAndroidInpage* mpp)
 {

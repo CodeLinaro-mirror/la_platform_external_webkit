@@ -990,6 +990,11 @@ bool RenderLayerCompositor::requiresCompositingForMobileSites(const RenderLayer*
         return false;
 
     RenderObject* renderer = layer->renderer();
+
+    // Check for videos
+    if (requiresCompositingForVideo(renderer))
+        return true;
+
     // Check for transforms
     if (requiresCompositingForTransform(renderer))
         return true;

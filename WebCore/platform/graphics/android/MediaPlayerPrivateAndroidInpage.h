@@ -128,6 +128,10 @@ public:
     void setSize(const IntSize& size);
     void paint(GraphicsContext* gc, const IntRect& rect);
     bool hasAvailableVideoFrame() const;
+#if USE(ACCELERATED_COMPOSITING)
+    virtual bool supportsAcceleratedRendering() const { return true; }
+    virtual void acceleratedRenderingStateChanged();
+#endif
 
     String url() const { return m_url; }
 
@@ -169,6 +173,10 @@ private:
 
         return static_cast<char*>(m_frameHeap->getBase()) + (index * m_frameSize);
     }
+
+#if USE(ACCELERATED_COMPOSITING)
+    void setDrawsContent();
+#endif
 
     Timer<MediaPlayerPrivateAndroidInpage> m_timer;
 
