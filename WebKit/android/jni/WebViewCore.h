@@ -1,5 +1,6 @@
 /*
  * Copyright 2006, The Android Open Source Project
+ * Copyright (c) 2010-2011, Code Aurora Forum. All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions
@@ -376,6 +377,8 @@ namespace android {
         bool isPlugin(PluginWidgetAndroid*) const;
         void invalPlugin(PluginWidgetAndroid*);
         void drawPlugins();
+        void hidePlugins();
+        void showPlugins();
 
         // send the current screen size/zoom to all of the plugins in our list
         void sendPluginVisibleScreen();

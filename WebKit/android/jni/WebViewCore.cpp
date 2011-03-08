@@ -1,5 +1,6 @@
 /*
  * Copyright 2006, The Android Open Source Project
+ * Copyright (c) 2010-2011, Code Aurora Forum. All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions
@@ -2640,6 +2641,26 @@ void WebViewCore::setScrollbarModes(ScrollbarMode horizontalMode, ScrollbarMode 
     checkException(env);
 }
 
+void WebViewCore::hidePlugins()
+{
+    PluginWidgetAndroid** iter = m_plugins.begin();
+    PluginWidgetAndroid** stop = m_plugins.end();
+    for (; iter < stop; ++iter) {
+        PluginWidgetAndroid* w = *iter;
+        w->pluginView()->hide();
+    }
+}
+
+void WebViewCore::showPlugins()
+{
+    PluginWidgetAndroid** iter = m_plugins.begin();
+    PluginWidgetAndroid** stop = m_plugins.end();
+    for (; iter < stop; ++iter) {
+        PluginWidgetAndroid* w = *iter;
+        w->pluginView()->show();
+    }
+}
+
 //----------------------------------------------------------------------
 // Native JNI methods
 //----------------------------------------------------------------------
@@ -3245,6 +3266,18 @@ static void FullScreenPluginHidden(JNIEnv* env, jobject obj, jint npp)
         plugin->exitFullScreen(false);
 }
 
+static void HidePluginsDuringSmoothRotate(JNIEnv* env, jobject obj)
+{
+    WebViewCore* viewImpl = GET_NATIVE_VIEW(env, obj);
+    viewImpl->hidePlugins();
+}
+
+static void ShowPluginsAfterSmoothRotate(JNIEnv* env, jobject obj)
+{
+    WebViewCore* viewImpl = GET_NATIVE_VIEW(env, obj);
+    viewImpl->showPlugins();
+}
+
 static WebCore::IntRect jrect_to_webrect(JNIEnv* env, jobject obj)
 {
     int L, T, R, B;
@@ -3361,6 +3394,10 @@ static JNINativeMethod gJavaWebViewCoreMethods[] = {
         (void*) ProvideVisitedHistory },
     { "nativeFullScreenPluginHidden", "(I)V",
         (void*) FullScreenPluginHidden },
+    { "nativeShowPluginsAfterSmoothRotate", "()V",
+        (void*) ShowPluginsAfterSmoothRotate},
+    { "nativeHidePluginsDuringSmoothRotate", "()V",
+        (void*) HidePluginsDuringSmoothRotate},
     { "nativeValidNodeAndBounds", "(IILandroid/graphics/Rect;)Z",
         (void*) ValidNodeAndBounds },
 };
