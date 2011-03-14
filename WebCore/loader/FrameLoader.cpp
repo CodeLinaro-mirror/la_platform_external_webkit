@@ -855,6 +855,7 @@ void FrameLoader::begin(const KURL& url, bool dispatch, SecurityOrigin* origin)
 
     document->setURL(m_URL);
     m_frame->setDocument(document);
+    document->setUserAgent(userAgent(m_URL));
 
     if (m_pendingStateObject) {
         document->statePopped(m_pendingStateObject.get());
@@ -3753,6 +3754,11 @@ void FrameLoader::cachePageForHistoryItem(HistoryItem* item)
         if (headerDIV) {
             item->setHeaderDIV(headerDIV);
             item->setContentRenderer(headerDIV->document()->frame()->contentRenderer());
+            item->setUserAgent(m_frame->document()->userAgent());
+        } else {
+            item->setHeaderDIV(0);
+            item->setContentRenderer(0);
+            item->setUserAgent(String());
         }
         RefPtr<CachedPage> cachedPage = CachedPage::create(page);
         pageCache()->add(item, cachedPage.release());
