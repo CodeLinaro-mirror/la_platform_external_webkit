@@ -1724,7 +1724,7 @@ HistoryItem* FrameView::findCachedHeader(const KURL& originalUrl) const
     while(size >= 0) {
         WebCore::HistoryItem *item = items[size].get();
         if(item->isInPageCache()) {
-            if ((originalUrl == item->originalURL()) || (originalUrl == item->url()))
+            if (((originalUrl == item->originalURL()) || (originalUrl == item->url())) &&   (item->userAgent() == m_frame->loader()->userAgent(m_frame->loader()->url())))
                 return item;
         }
         if(size == 0)

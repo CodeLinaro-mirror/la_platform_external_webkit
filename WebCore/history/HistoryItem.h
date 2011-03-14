@@ -205,6 +205,8 @@ public:
     void setHeaderDIV(Element* headerDIV) { m_headerDIV = headerDIV; }
     RenderView* contentRenderer() const { return m_contentRenderer; }
     void setContentRenderer(RenderView* renderView) { m_contentRenderer = renderView; }
+    const String& userAgent() const { return m_userAgent; }
+    void setUserAgent(const String& userAgent) { m_userAgent = userAgent; }
     bool shouldPaintHeader() const { return m_shouldPaintHeader; }
     void setShouldPaintHeader(bool shouldPaintHeader) { m_shouldPaintHeader = shouldPaintHeader; }
 
@@ -278,6 +280,7 @@ private:
 
     Element* m_headerDIV;
     RenderView* m_contentRenderer;
+    String m_userAgent;
     bool m_shouldPaintHeader;
 
 }; //class HistoryItem
