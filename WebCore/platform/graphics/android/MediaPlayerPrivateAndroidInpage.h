@@ -96,6 +96,7 @@ public:
 
 private:
     static MediaPlayerPrivateInterface* create(MediaPlayer* player);
+    static MediaPlayer::MediaEngineType getMediaEngineType() { return MediaPlayer::Inpage; }
     static void getSupportedTypes(HashSet<String>& types);
     static MediaPlayer::SupportsType supportsType(const String& type, const String& codecs);
     static HashSet<String> mimeTypeCache();
@@ -107,6 +108,7 @@ public:
     void cancelLoad();
     void play();
     void pause();
+    bool supportsFullscreen() const { return true; }
     IntSize naturalSize() const { return IntSize(m_width, m_height); }
     bool hasVideo() const { return m_hasVideo; }
     bool hasAudio() const { return m_hasAudio; }
@@ -127,9 +129,13 @@ public:
     void paint(GraphicsContext* gc, const IntRect& rect);
     bool hasAvailableVideoFrame() const;
 
+    String url() const { return m_url; }
+
     // constants
 private:
-    static const double TimerFrequency = 0.033; // for 30 FPS
+    // See http://www.whatwg.org/specs/web-apps/current-work/#event-media-timeupdate
+    static const double TimerFrequency = 0.250; // The spec says the timer should fire every 250 ms or less.
+    static const double VideoTimerFrequency = 0.033; // for 30 FPS
     static const int NumFrameBuffer = 4; // minimal of 2
     static const int SecondsToMilliseconds = 1000;
 
@@ -170,6 +176,8 @@ private:
 
     android::sp<android::MediaPlayer> m_mp;
 
+    String m_url;
+
     MediaPlayer::NetworkState m_networkState;
     MediaPlayer::ReadyState m_readyState;
 
@@ -190,6 +198,7 @@ private:
     bool m_seeking;
     bool m_completed;
     bool m_realloc;
+    float m_seekTime;
     int32_t m_frameUsecsBuffered; // Amount of frames buffered by the media player expressed in usecs.
 
     MessageQueue<MessagePacket> m_notifyQueue;
