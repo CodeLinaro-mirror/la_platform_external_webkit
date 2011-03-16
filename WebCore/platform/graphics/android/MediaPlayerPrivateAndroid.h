@@ -86,6 +86,9 @@ public:
     virtual void prepareToPlay();
 
     virtual void paint(GraphicsContext*, const IntRect&) { }
+#if ENABLE(INPAGE_VIDEO)
+    virtual String url() const { return m_url; }
+#endif
 
     virtual void onPrepared(int duration, int width, int height) { }
     void onEnded();
@@ -93,9 +96,16 @@ public:
     virtual void onPosterFetched(SkBitmap*) { }
     void onBuffering(int percent);
     void onTimeupdate(int position);
+#if ENABLE(INPAGE_VIDEO)
+    void onHidden();
+#endif
+
 protected:
     // Android-specific methods and fields.
     static MediaPlayerPrivateInterface* create(MediaPlayer* player);
+#if ENABLE(INPAGE_VIDEO)
+    static MediaPlayer::MediaEngineType getMediaEngineType() { return MediaPlayer::Fullscreen; }
+#endif
     static void getSupportedTypes(HashSet<String>&) { }
     static MediaPlayer::SupportsType supportsType(const String& type, const String& codecs);
 
