@@ -75,7 +75,12 @@ MediaPlayerPrivate::~MediaPlayerPrivate()
 
 void MediaPlayerPrivate::registerMediaEngine(MediaEngineRegistrar registrar)
 {
-    registrar(create, getSupportedTypes, supportsType);
+    registrar(create,
+#if ENABLE(INPAGE_VIDEO)
+              getMediaEngineType,
+#endif
+              getSupportedTypes,
+              supportsType);
 }
 
 void MediaPlayerPrivate::pause()
@@ -157,7 +162,6 @@ void MediaPlayerPrivate::onEnded() {
 
 void MediaPlayerPrivate::onPaused() {
     m_paused = true;
-    m_currentTime = 0;
     m_hasVideo = false;
     m_networkState = MediaPlayer::Idle;
     m_readyState = MediaPlayer::HaveNothing;
@@ -167,6 +171,12 @@ void MediaPlayerPrivate::onTimeupdate(int position) {
     m_currentTime = position / 1000.0f;
     m_player->timeChanged();
 }
+
+#if ENABLE(INPAGE_VIDEO)
+void MediaPlayerPrivate::onHidden() {
+    m_player->swapMediaEngine(MediaPlayer::Inpage);
+}
+#endif
 
 class MediaPlayerVideoPrivate : public MediaPlayerPrivate {
 public:
@@ -480,6 +490,15 @@ static void OnTimeupdate(JNIEnv* env, jobject obj, int position, int pointer) {
     }
 }
 
+static void OnHidden(JNIEnv* env, jobject obj, int pointer) {
+#if ENABLE(INPAGE_VIDEO)
+    if (pointer) {
+        WebCore::MediaPlayerPrivate* player = reinterpret_cast<WebCore::MediaPlayerPrivate*>(pointer);
+        player->onHidden();
+    }
+#endif
+}
+
 /*
  * JNI registration
  */
@@ -494,6 +513,8 @@ static JNINativeMethod g_MediaPlayerMethods[] = {
         (void*) OnPosterFetched },
     { "nativeOnTimeupdate", "(II)V",
         (void*) OnTimeupdate },
+    { "nativeOnHidden", "(I)V",
+        (void*) OnHidden }, // Only used by INPAGE_VIDEO but needs to be present for JNI.
 };
 
 static JNINativeMethod g_MediaAudioPlayerMethods[] = {

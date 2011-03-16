@@ -27,26 +27,30 @@
 
 #include "config.h"
 
-#include "ApplicationCacheStorage.h"
 #include "ChromeClientAndroid.h"
+
+#include "ApplicationCacheStorage.h"
 #include "CString.h"
 #include "DatabaseTracker.h"
 #include "Document.h"
-#include "PlatformString.h"
 #include "FloatRect.h"
 #include "Frame.h"
 #include "FrameLoader.h"
 #include "FrameView.h"
 #include "Geolocation.h"
 #include "GraphicsLayerAndroid.h"
+#if ENABLE(INPAGE_VIDEO)
+#include "HTMLVideoElement.h"
+#endif
 #include "Page.h"
+#include "PlatformString.h"
 #include "Screen.h"
 #include "ScriptController.h"
+#include "Settings.h"
 #include "WebCoreFrameBridge.h"
 #include "WebCoreViewBridge.h"
 #include "WebViewCore.h"
 #include "WindowFeatures.h"
-#include "Settings.h"
 
 namespace android {
 
@@ -97,6 +101,27 @@ void ChromeClientAndroid::attachRootGraphicsLayer(WebCore::Frame* frame, WebCore
     scheduleCompositingLayerSync();
 }
 
+#endif
+
+#if ENABLE(INPAGE_VIDEO)
+bool ChromeClientAndroid::supportsFullscreenForNode(const Node* node)
+{
+    return node->hasTagName(HTMLNames::videoTag);
+}
+
+void ChromeClientAndroid::enterFullscreenForNode(Node* node)
+{
+    if (!node->hasTagName(HTMLNames::videoTag))
+        return;
+
+    HTMLVideoElement* videoElement = static_cast<HTMLVideoElement*>(node);
+    MediaPlayer* player = videoElement->player();
+    player->pause();
+
+    // Switch to MediaPlayerPrivateAndroid for fullscreen.
+    player->swapMediaEngine(MediaPlayer::Fullscreen);
+    player->play();
+}
 #endif
 
 void ChromeClientAndroid::setWebFrame(android::WebFrame* webframe)

@@ -168,6 +168,10 @@ namespace android {
         virtual void scheduleCompositingLayerSync();
         void syncTimerFired(Timer<ChromeClientAndroid>*);
 #endif
+#if ENABLE(INPAGE_VIDEO)
+        virtual bool supportsFullscreenForNode(const Node*);
+        virtual void enterFullscreenForNode(Node*);
+#endif
 
     private:
         android::WebFrame* m_webFrame;

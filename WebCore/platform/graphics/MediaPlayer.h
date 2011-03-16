@@ -20,7 +20,7 @@
  * PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON ANY THEORY
  * OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
  * (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
- * OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE. 
+ * OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
 #ifndef MediaPlayer_h
@@ -89,10 +89,10 @@ public:
 
     // time has jumped, eg. not as a result of normal playback
     virtual void mediaPlayerTimeChanged(MediaPlayer*) { }
-    
+
     // the media file duration has changed, or is now known
     virtual void mediaPlayerDurationChanged(MediaPlayer*) { }
-    
+
     // the playback rate has changed
     virtual void mediaPlayerRateChanged(MediaPlayer*) { }
 
@@ -143,45 +143,51 @@ public:
     enum MediaElementType { Video, Audio };
     void setMediaElementType(MediaElementType type) { m_mediaElementType = type; }
     MediaElementType mediaElementType() { return m_mediaElementType; }
+#if ENABLE(INPAGE_VIDEO)
+    enum MediaEngineType { Inpage, Fullscreen };
+    MediaEngineType mediaEngineType() const { return m_mediaEngineType; }
+
+    void swapMediaEngine(MediaEngineType type);
 #endif
-    
+#endif
+
     void setFrameView(FrameView* frameView) { m_frameView = frameView; }
     FrameView* frameView() { return m_frameView; }
     bool inMediaDocument();
-    
+
     IntSize size() const { return m_size; }
     void setSize(const IntSize& size);
-    
+
     void load(const String& url, const ContentType& contentType);
     void cancelLoad();
-    
+
     bool visible() const;
     void setVisible(bool);
-    
+
     void prepareToPlay();
     void play();
-    void pause();    
-    
+    void pause();
+
     bool paused() const;
     bool seeking() const;
-    
+
     float duration() const;
     float currentTime() const;
     void seek(float time);
 
     float startTime() const;
-    
+
     float rate() const;
     void setRate(float);
 
-    bool preservesPitch() const;    
+    bool preservesPitch() const;
     void setPreservesPitch(bool);
-    
+
     PassRefPtr<TimeRanges> buffered();
     float maxTimeSeekable();
 
     unsigned bytesLoaded();
-    
+
     float volume() const;
     void setVolume(float);
 
@@ -192,18 +198,18 @@ public:
     bool hasClosedCaptions() const;
     void setClosedCaptionsVisible(bool closedCaptionsVisible);
 
-    bool autobuffer() const;    
+    bool autobuffer() const;
     void setAutobuffer(bool);
 
     void paint(GraphicsContext*, const IntRect&);
     void paintCurrentFrameInContext(GraphicsContext*, const IntRect&);
-    
+
     enum NetworkState { Empty, Idle, Loading, Loaded, FormatError, NetworkError, DecodeError };
     NetworkState networkState();
 
     enum ReadyState  { HaveNothing, HaveMetadata, HaveCurrentData, HaveFutureData, HaveEnoughData };
     ReadyState readyState();
-    
+
     enum MovieLoadType { Unknown, Download, StoredStream, LiveStream };
     MovieLoadType movieLoadType() const;
 
@@ -257,6 +263,9 @@ private:
     bool m_autobuffer;
 #if PLATFORM(ANDROID)
     MediaElementType m_mediaElementType;
+#if ENABLE(INPAGE_VIDEO)
+    MediaEngineType m_mediaEngineType;
+#endif
 #endif
 #if ENABLE(PLUGIN_PROXY_FOR_VIDEO)
     WebMediaPlayerProxy* m_playerProxy;    // not owned or used, passed to m_private
@@ -264,12 +273,18 @@ private:
 };
 
 typedef MediaPlayerPrivateInterface* (*CreateMediaEnginePlayer)(MediaPlayer*);
+#if PLATFORM(ANDROID) && ENABLE(INPAGE_VIDEO)
+typedef MediaPlayer::MediaEngineType (*GetMediaEngineType)();
+#endif
 typedef void (*MediaEngineSupportedTypes)(HashSet<String>& types);
 typedef MediaPlayer::SupportsType (*MediaEngineSupportsType)(const String& type, const String& codecs);
 
-typedef void (*MediaEngineRegistrar)(CreateMediaEnginePlayer, MediaEngineSupportedTypes, MediaEngineSupportsType); 
-
-
+typedef void (*MediaEngineRegistrar)(CreateMediaEnginePlayer,
+#if PLATFORM(ANDROID) && ENABLE(INPAGE_VIDEO)
+                                     GetMediaEngineType,
+#endif
+                                     MediaEngineSupportedTypes,
+                                     MediaEngineSupportsType);
 }
 
 #endif // ENABLE(VIDEO)
