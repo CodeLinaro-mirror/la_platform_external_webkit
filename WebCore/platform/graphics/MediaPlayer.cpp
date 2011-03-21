@@ -51,6 +51,7 @@
 #include "MediaPlayerPrivateChromium.h"
 #elif PLATFORM(ANDROID)
 #include "MediaPlayerPrivateAndroid.h"
+#include "MediaPlayerPrivateAndroidInpage.h"
 #endif
 
 namespace WebCore {
@@ -150,6 +151,10 @@ static Vector<MediaPlayerFactory*>& installedMediaEngines()
 
     if (!enginesQueried) {
         enginesQueried = true;
+#if PLATFORM(ANDROID) && ENABLE(INPAGE_VIDEO)
+        // register inpage media engine first to give it priority for handling its types
+        MediaPlayerPrivateAndroidInpage::registerMediaEngine(addMediaEngine);
+#endif
         MediaPlayerPrivate::registerMediaEngine(addMediaEngine);
 
         // register additional engines here
