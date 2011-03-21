@@ -184,6 +184,14 @@ LOCAL_C_INCLUDES := $(LOCAL_C_INCLUDES) \
 	vendor/qcom/opensource/webkit/BackingStore
 endif
 
+# Uncomment line below to enable inpage video
+#WEBCORE_INPAGE_VIDEO := true
+ifeq ($(WEBCORE_INPAGE_VIDEO),true)
+LOCAL_C_INCLUDES := $(LOCAL_C_INCLUDES) \
+	vendor/qcom/opensource/webkit \
+	frameworks/base/include/media/stagefright/openmax
+endif
+
 ifeq ($(JAVASCRIPT_ENGINE),v8)
 # Include WTF source file.
 d := JavaScriptCore
@@ -279,6 +287,28 @@ ifeq ($(WEBCORE_ACCELERATED_SCROLLING),true)
 LOCAL_CFLAGS += -DENABLE_ACCELERATED_SCROLLING
 endif
 
+ifeq ($(WEBCORE_INPAGE_VIDEO),true)
+  ifneq ($(ARCH_ARM_HAVE_VFP),true)
+    WEBCORE_INPAGE_VIDEO := false
+  endif
+  ifneq ($(ARCH_ARM_HAVE_NEON),true)
+    WEBCORE_INPAGE_VIDEO := false
+  endif
+  ifneq ($(TARGET_ARCH),arm)
+    WEBCORE_INPAGE_VIDEO := false
+  endif
+
+  ifeq ($(WEBCORE_INPAGE_VIDEO),true)
+    WEBCORE_WEBKITACCEL := true
+
+    LOCAL_CFLAGS += -DENABLE_INPAGE_VIDEO
+
+    ifeq ($(WEBCORE_INPAGE_RGB565),true)
+      LOCAL_CFLAGS += -DENABLE_INPAGE_RGB565
+    endif
+  endif
+endif
+
 # LOCAL_LDLIBS is used in simulator builds only and simulator builds are only
 # valid on Linux
 LOCAL_LDLIBS += -lpthread -ldl
@@ -303,6 +333,10 @@ endif
 
 ifeq ($(WEBCORE_WEBKITACCEL),true)
 LOCAL_SHARED_LIBRARIES += libwebkitaccel
+endif
+
+ifeq ($(WEBCORE_INPAGE_VIDEO),true)
+LOCAL_SHARED_LIBRARIES += libbinder
 endif
 
 # We have to use the android version of libdl when we are not on the simulator
