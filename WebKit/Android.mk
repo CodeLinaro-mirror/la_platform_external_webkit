@@ -24,6 +24,7 @@ LOCAL_SRC_FILES := \
 	android/WebCoreSupport/FrameLoaderClientAndroid.cpp \
 	android/WebCoreSupport/GeolocationPermissions.cpp \
 	android/WebCoreSupport/MediaPlayerPrivateAndroid.cpp \
+	android/WebCoreSupport/MediaPlayerPrivateAndroidInpage.cpp \
 	android/WebCoreSupport/PlatformBridge.cpp \
 	android/WebCoreSupport/ResourceLoaderAndroid.cpp \
 	android/WebCoreSupport/V8Counters.cpp \
