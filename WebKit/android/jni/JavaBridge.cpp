@@ -353,9 +353,9 @@ void JavaBridge::SetCacheSize(JNIEnv* env, jobject obj, jint bytes)
     {
         char value[PROPERTY_VALUE_MAX] = {'\0'};
 
-        property_get("webkit.cache.mindeadsize", value, "0");
+        property_get("net.webkit.cache.mindeadsize", value, "0");
         minDeadSize = (unsigned)atoi(value);
-        property_get("webkit.cache.maxdeadsize", value, NULL);
+        property_get("net.webkit.cache.maxdeadsize", value, NULL);
         if (NULL!=value)
         {
             maxDeadSize = (unsigned)atoi(value);
