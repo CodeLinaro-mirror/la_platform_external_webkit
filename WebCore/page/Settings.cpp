@@ -766,4 +766,11 @@ void Settings::setLoadDeferringEnabled(bool enabled)
     m_loadDeferringEnabled = enabled;
 }
 
+#if PLATFORM(ANDROID) && ENABLE(INPAGE_VIDEO)
+void Settings::setInpageVideoEnabled(bool enabled)
+{
+    m_inpageVideoEnabled = enabled;
+}
+#endif
+
 } // namespace WebCore

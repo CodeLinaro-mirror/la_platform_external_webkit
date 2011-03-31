@@ -120,6 +120,7 @@ struct FieldIds {
         mShrinksStandaloneImagesToFit = env->GetFieldID(clazz, "mShrinksStandaloneImagesToFit", "Z");
         mUseDoubleTree = env->GetFieldID(clazz, "mUseDoubleTree", "Z");
         mPageCacheCapacity = env->GetFieldID(clazz, "mPageCacheCapacity", "I");
+        mInpageVideoEnabled = env->GetFieldID(clazz, "mInpageVideoEnabled", "Z");
 
         LOG_ASSERT(mLayoutAlgorithm, "Could not find field mLayoutAlgorithm");
         LOG_ASSERT(mTextSize, "Could not find field mTextSize");
@@ -156,6 +157,7 @@ struct FieldIds {
         LOG_ASSERT(mShrinksStandaloneImagesToFit, "Could not find field mShrinksStandaloneImagesToFit");
         LOG_ASSERT(mUseDoubleTree, "Could not find field mUseDoubleTree");
         LOG_ASSERT(mPageCacheCapacity, "Could not find field mPageCacheCapacity");
+        LOG_ASSERT(mInpageVideoEnabled, "Could not find field mInpageVideoEnabled");
 
         jclass c = env->FindClass("java/lang/Enum");
         LOG_ASSERT(c, "Could not find Enum class!");
@@ -201,6 +203,7 @@ struct FieldIds {
     jfieldID mShrinksStandaloneImagesToFit;
     jfieldID mUseDoubleTree;
     jfieldID mPageCacheCapacity;
+    jfieldID mInpageVideoEnabled;
     // Ordinal() method and value field for enums
     jmethodID mOrdinal;
     jfieldID  mTextSizeValue;
@@ -428,6 +431,11 @@ public:
             WebCore::pageCache()->setCapacity(size);
         } else
             s->setUsesPageCache(false);
+
+#if PLATFORM(ANDROID) && ENABLE(INPAGE_VIDEO)
+        flag = env->GetBooleanField(obj, gFieldIds->mInpageVideoEnabled);
+        s->setInpageVideoEnabled(flag);
+#endif
     }
 };
 
