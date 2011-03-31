@@ -152,6 +152,7 @@ public:
     MediaEngineType mediaEngineType() const { return m_mediaEngineType; }
 
     void swapMediaEngine(MediaEngineType type);
+    bool inpageVideoEnabled() const;
 #endif
 #endif
 

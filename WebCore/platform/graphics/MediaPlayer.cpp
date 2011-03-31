@@ -35,6 +35,7 @@
 #include "FrameView.h"
 #include "Frame.h"
 #include "Document.h"
+#include "Settings.h"
 #include "TimeRanges.h"
 
 #if PLATFORM(MAC)
@@ -266,9 +267,6 @@ MediaPlayer::MediaPlayer(MediaPlayerClient* client)
     , m_autobuffer(false)
 #if PLATFORM(ANDROID)
     , m_mediaElementType(Video)
-#if ENABLE(INPAGE_VIDEO)
-    , m_mediaEngineType(Inpage)
-#endif
 #endif
 #if ENABLE(PLUGIN_PROXY_FOR_VIDEO)
     , m_playerProxy(0)
@@ -281,6 +279,9 @@ MediaPlayer::MediaPlayer(MediaPlayerClient* client)
         m_private.clear();
         m_private.set(engines[0]->constructor(this));
     }
+#endif
+#if PLATFORM(ANDROID) && ENABLE(INPAGE_VIDEO)
+    m_mediaEngineType = inpageVideoEnabled() ? Inpage : Fullscreen;
 #endif
 }
 
@@ -428,7 +429,7 @@ bool MediaPlayer::hasAudio() const
 #if PLATFORM(ANDROID) && ENABLE(INPAGE_VIDEO)
 void MediaPlayer::swapMediaEngine(MediaEngineType type)
 {
-    if (mediaEngineType() == type)
+    if (!inpageVideoEnabled() || mediaEngineType() == type)
         return;
 
     float time = currentTime();
@@ -437,6 +438,19 @@ void MediaPlayer::swapMediaEngine(MediaEngineType type)
     if (type == Fullscreen)
         setVisible(true); // Forces the creation of the Java view if switching to fullscreen.
     seek(time);
+}
+
+bool MediaPlayer::inpageVideoEnabled() const
+{
+    if (!m_mediaPlayerClient)
+        return false;
+
+    Document* document = m_mediaPlayerClient->mediaPlayerOwningDocument();
+    if (!document)
+        return false;
+
+    Settings* settings = document->settings();
+    return settings && settings->inpageVideoEnabled();
 }
 #endif
 
