@@ -353,6 +353,11 @@ namespace WebCore {
         void setLoadDeferringEnabled(bool);
         bool loadDeferringEnabled() const { return m_loadDeferringEnabled; }
 
+#if PLATFORM(ANDROID) && ENABLE(INPAGE_VIDEO)
+        void setInpageVideoEnabled(bool);
+        bool inpageVideoEnabled() const { return m_inpageVideoEnabled; }
+#endif
+
     private:
         Page* m_page;
         
@@ -465,6 +470,9 @@ namespace WebCore {
         bool m_loadDeferringEnabled : 1;
 #ifdef ANDROID_PLUGINS
         bool m_pluginsOnDemand : 1;
+#endif
+#if PLATFORM(ANDROID) && ENABLE(INPAGE_VIDEO)
+        bool m_inpageVideoEnabled : 1;
 #endif
 
 #if USE(SAFARI_THEME)
