@@ -64,6 +64,8 @@ ifneq ($(JAVASCRIPT_ENGINE),jsc)
   endif
 endif
 
+WEBCORE_ACCELERATED_SCROLLING := true
+
 ifeq ($(WEBCORE_ACCELERATED_SCROLLING),true)
         WEBCORE_WEBKITACCEL := true
 endif
