@@ -188,6 +188,7 @@ protected:
     virtual void didMoveToNewOwnerDocument();
 
 private: // MediaPlayerClient
+    virtual Document* mediaPlayerOwningDocument();
     virtual void mediaPlayerNetworkStateChanged(MediaPlayer*);
     virtual void mediaPlayerReadyStateChanged(MediaPlayer*);
     virtual void mediaPlayerTimeChanged(MediaPlayer*);
