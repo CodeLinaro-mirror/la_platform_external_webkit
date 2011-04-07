@@ -64,6 +64,7 @@
 #include "TimeRanges.h"
 #include "Timer.h"
 #include "WKAccel.h"
+#include "WebViewCore.h"
 #include "binder/MemoryHeapBase.h"
 #include "binder/Parcel.h"
 #include "binder/ProcessState.h"
@@ -120,32 +121,11 @@ MediaPlayerPrivateInterface* MediaPlayerPrivateAndroidInpage::create(MediaPlayer
     return new MediaPlayerPrivateAndroidInpage(player);
 }
 
-void MediaPlayerPrivateAndroidInpage::getSupportedTypes(HashSet<String>& types)
-{
-    types = mimeTypeCache();
-}
-
 MediaPlayer::SupportsType MediaPlayerPrivateAndroidInpage::supportsType(const String& type, const String& codecs)
 {
-    if (type.isNull())
-        return MediaPlayer::IsNotSupported;
-
-    if (mimeTypeCache().contains(type))
-        return codecs.isEmpty() ? MediaPlayer::MayBeSupported : MediaPlayer::IsSupported;
-
+    if (android::WebViewCore::supportsMimeType(type))
+        return MediaPlayer::MayBeSupported;
     return MediaPlayer::IsNotSupported;
-}
-
-HashSet<String> MediaPlayerPrivateAndroidInpage::mimeTypeCache()
-{
-    static HashSet<String> cache;
-
-    if (cache.isEmpty()) {
-        cache.add(String("video/mp4"));
-        cache.add(String("video/3gpp"));
-    }
-
-    return cache;
 }
 
 MediaPlayerPrivateAndroidInpage::~MediaPlayerPrivateAndroidInpage()
@@ -236,9 +216,8 @@ void MediaPlayerPrivateAndroidInpage::setVisible(bool b)
         unregisterHeap();
         SLOGV("not visible -- suspending android::mediaplayer");
         m_mp->suspend();
-    } else {
+    } else
         SLOGV("not visible and not prepared");
-    }
 }
 
 float MediaPlayerPrivateAndroidInpage::currentTime() const
