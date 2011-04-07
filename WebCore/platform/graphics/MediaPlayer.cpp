@@ -26,6 +26,7 @@
 #include "config.h"
 
 #if ENABLE(VIDEO)
+
 #include "MediaPlayer.h"
 #include "MediaPlayerPrivate.h"
 
@@ -166,7 +167,12 @@ static void addMediaEngine(CreateMediaEnginePlayer,
 #endif
                            MediaEngineSupportedTypes,
                            MediaEngineSupportsType);
-static MediaPlayerFactory* chooseBestEngineForTypeAndCodecs(const String& type, const String& codecs);
+
+static MediaPlayerFactory* chooseBestEngineForTypeAndCodecs(const String& type,
+#if PLATFORM(ANDROID) && ENABLE(INPAGE_VIDEO)
+                                                            const MediaPlayer::MediaEngineType engineType,
+#endif
+                                                            const String& codecs);
 
 static Vector<MediaPlayerFactory*>& installedMediaEngines()
 {
@@ -208,7 +214,11 @@ static void addMediaEngine(CreateMediaEnginePlayer constructor,
                                                           supportsType));
 }
 
-static MediaPlayerFactory* chooseBestEngineForTypeAndCodecs(const String& type, const String& codecs)
+static MediaPlayerFactory* chooseBestEngineForTypeAndCodecs(const String& type,
+#if PLATFORM(ANDROID) && ENABLE(INPAGE_VIDEO)
+                                                            const MediaPlayer::MediaEngineType engineType,
+#endif
+                                                            const String& codecs)
 {
     Vector<MediaPlayerFactory*>& engines = installedMediaEngines();
 
@@ -217,15 +227,31 @@ static MediaPlayerFactory* chooseBestEngineForTypeAndCodecs(const String& type, 
 
     MediaPlayerFactory* engine = 0;
     MediaPlayer::SupportsType supported = MediaPlayer::IsNotSupported;
+#if PLATFORM(ANDROID) && ENABLE(INPAGE_VIDEO)
+    MediaPlayerFactory* engineInpage = 0;
+    MediaPlayer::SupportsType supportedInpage = MediaPlayer::IsNotSupported;
+#endif
 
     unsigned count = engines.size();
     for (unsigned ndx = 0; ndx < count; ndx++) {
         MediaPlayer::SupportsType engineSupport = engines[ndx]->supportsTypeAndCodecs(type, codecs);
+#if PLATFORM(ANDROID) && ENABLE(INPAGE_VIDEO)
+        if (engines[ndx]->getMediaEngineType() == MediaPlayer::Inpage && engineSupport > supportedInpage) {
+            supportedInpage = engineSupport;
+            engineInpage = engines[ndx];
+            continue;
+        }
+#endif
         if (engineSupport > supported) {
             supported = engineSupport;
             engine = engines[ndx];
         }
     }
+
+#if PLATFORM(ANDROID) && ENABLE(INPAGE_VIDEO)
+    if (engineInpage && (engineType == MediaPlayer::Inpage || !engine))
+        engine = engineInpage;
+#endif
 
     return engine;
 }
@@ -307,14 +333,18 @@ void MediaPlayer::load(const String& url, const ContentType& contentType)
 
     MediaPlayerFactory* engine = 0;
 
-#if PLATFORM(ANDROID) && ENABLE(INPAGE_VIDEO)
-    engine = findMediaEngineByType(mediaEngineType());
-#else
     if (!type.isEmpty())
-        engine = chooseBestEngineForTypeAndCodecs(type, codecs);
+        engine = chooseBestEngineForTypeAndCodecs(type,
+#if PLATFORM(ANDROID) && ENABLE(INPAGE_VIDEO)
+                                                  mediaEngineType(),
+#endif
+                                                  codecs);
 
     // if we didn't find an engine that claims the MIME type, just use the first engine
     if (!engine && !installedMediaEngines().isEmpty())
+#if PLATFORM(ANDROID) && ENABLE(INPAGE_VIDEO)
+        engine = findMediaEngineByType(mediaEngineType());
+#else
         engine = installedMediaEngines()[0];
 #endif
 
@@ -595,7 +625,11 @@ MediaPlayer::SupportsType MediaPlayer::supportsType(ContentType contentType)
 {
     String type = contentType.type();
     String codecs = contentType.parameter("codecs");
-    MediaPlayerFactory* engine = chooseBestEngineForTypeAndCodecs(type, codecs);
+    MediaPlayerFactory* engine = chooseBestEngineForTypeAndCodecs(type,
+#if PLATFORM(ANDROID) && ENABLE(INPAGE_VIDEO)
+                                                                  MediaPlayer::Fullscreen,
+#endif
+                                                                  codecs);
 
     if (!engine)
         return IsNotSupported;

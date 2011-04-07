@@ -97,9 +97,8 @@ public:
 private:
     static MediaPlayerPrivateInterface* create(MediaPlayer* player);
     static MediaPlayer::MediaEngineType getMediaEngineType() { return MediaPlayer::Inpage; }
-    static void getSupportedTypes(HashSet<String>& types);
+    static void getSupportedTypes(HashSet<String>&) { }
     static MediaPlayer::SupportsType supportsType(const String& type, const String& codecs);
-    static HashSet<String> mimeTypeCache();
 
     // MediaPlayerPrivateInterface
 public:
