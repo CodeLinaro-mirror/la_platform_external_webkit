@@ -224,8 +224,11 @@ LOCAL_CFLAGS += -include "WebCorePrefix.h"
 LOCAL_CFLAGS += -fvisibility=hidden
 
 # Comment this line below to disable the ImageDecode thread which
-# caches decoded images.
+# caches decoded images. Assuming QCOM_TARGET_PRODUCT is a value (not a list).
+ifneq ($(findstring $(QCOM_TARGET_PRODUCT),msm7627_7x_ffa msm7627_7x_surf \
+		msm7627_ffa msm7627_surf),$(QCOM_TARGET_PRODUCT))
 LOCAL_CFLAGS += -DCACHED_IMAGE_DECODE
+endif
 
 # Enable JSC JIT if JSC is used and ENABLE_JSC_JIT environment
 # variable is set to true
