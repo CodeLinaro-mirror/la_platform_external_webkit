@@ -712,6 +712,16 @@ void HTMLMediaElement::cancelPendingEventsAndCallbacks()
     }
 }
 
+Document* HTMLMediaElement::mediaPlayerOwningDocument()
+{
+    Document* d = document();
+
+    if (!d)
+        d = ownerDocument();
+
+    return d;
+}
+
 void HTMLMediaElement::mediaPlayerNetworkStateChanged(MediaPlayer*)
 {
     beginProcessingMediaPlayerCallback();

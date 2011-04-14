@@ -117,6 +117,10 @@ public:
 
     virtual MediaPlayer::MovieLoadType movieLoadType() const { return MediaPlayer::Unknown; }
 
+#if PLATFORM(ANDROID) && ENABLE(INPAGE_VIDEO)
+    virtual String url() const = 0;
+#endif
+
 };
 
 }
