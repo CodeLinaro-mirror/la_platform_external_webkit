@@ -150,6 +150,7 @@ HashSet<String> MediaPlayerPrivateAndroidInpage::mimeTypeCache()
 
 MediaPlayerPrivateAndroidInpage::~MediaPlayerPrivateAndroidInpage()
 {
+    SLOGV("destroying MediaPlayerPrivateAndroidInpage instance");
     m_timer.stop();
     m_notifyQueue.kill();
 
@@ -173,6 +174,7 @@ void MediaPlayerPrivateAndroidInpage::load(const String& url)
     if (!cookie.isEmpty())
         headers.add(android::String8("Cookie"), android::String8(cookie.utf8().data()));
 
+    SLOGV("setting data source for android::mediaplayer (0x%08lX->0x%08lX,%s)", reinterpret_cast<long>(m_player), reinterpret_cast<long>(this), url.utf8().data());
     CHECK_NETWORK_STATE(m_mp->setDataSource(url.utf8().data(), &headers));
     CHECK_NETWORK_STATE(m_mp->setListener(WebCoreMediaPlayerListener::create(this)));
 
@@ -189,7 +191,6 @@ void MediaPlayerPrivateAndroidInpage::load(const String& url)
     m_readyState = MediaPlayer::HaveMetadata;
     m_player->readyStateChanged();
 
-    registerHeap(false);
     m_mp->prepareAsync();
 
 #if USE(ACCELERATED_COMPOSITING)
@@ -204,6 +205,10 @@ void MediaPlayerPrivateAndroidInpage::cancelLoad()
 
 void MediaPlayerPrivateAndroidInpage::play()
 {
+    if (!m_visible)
+        return;
+
+    SLOGW("inpage video starting");
     if (m_hasVideo && m_shouldShowPoster) {
         m_shouldShowPoster = false;
         static_cast<HTMLVideoElement*>(m_player->mediaPlayerClient())->updatePosterImage();
@@ -214,6 +219,7 @@ void MediaPlayerPrivateAndroidInpage::play()
 
 void MediaPlayerPrivateAndroidInpage::pause()
 {
+    SLOGW("inpage video paused");
     m_mp->pause();
 }
 
@@ -224,17 +230,14 @@ void MediaPlayerPrivateAndroidInpage::setVisible(bool b)
 
     m_visible = b;
     if (m_visible) {
-        registerHeap();
+        SLOGV("visible -- resuming android::mediaplayer");
         m_mp->resume();
-
-        if (!m_hasVideo)
-            return;
-
-        for (int index = NumFrameBuffer; index; --index)
-            sendFrameToMediaPlayer(index-1);
-    } else {
+    } else if (m_prepared) {
         unregisterHeap();
+        SLOGV("not visible -- suspending android::mediaplayer");
         m_mp->suspend();
+    } else {
+        SLOGV("not visible and not prepared");
     }
 }
 
@@ -252,6 +255,7 @@ float MediaPlayerPrivateAndroidInpage::currentTime() const
 
 void MediaPlayerPrivateAndroidInpage::seek(float seconds)
 {
+    SLOGV("seeking to %f seconds", seconds);
     if (!m_prepared) {
         m_seekTime  = seconds;
         return;
@@ -337,24 +341,26 @@ void MediaPlayerPrivateAndroidInpage::paint(GraphicsContext* gc, const IntRect& 
         return;
     }
 
+    int frame = m_frameQueue.first();
+    m_frameQueue.removeFirst();
+
+    char* yuvFrame = getFramePtr(frame);
+    if (!yuvFrame) {
+        canvas->drawBitmapRect(m_videoBitmap, 0, rect, 0);
+        return;
+    }
+
     // This will free current pixels, re-allocate, and lockPixels all in one
     // call. No need to call lock/unlock pixels when allocating pixels from
     // malloc heap.
     m_videoBitmap.allocPixels();
 
-    int frame = m_frameQueue.first();
-    m_frameQueue.removeFirst();
+    char* pixels = static_cast<char*>(m_videoBitmap.getPixels());
+    yuvToRGBFrame(yuvFrame, pixels);
 
-    char* yuvFrame = getFramePtr(frame);
+    sendFrameToMediaPlayer(frame);
 
-    if (yuvFrame) {
-        char* pixels = static_cast<char*>(m_videoBitmap.getPixels());
-        yuvToRGBFrame(yuvFrame, pixels);
-
-        sendFrameToMediaPlayer(frame);
-
-        canvas->drawBitmapRect(m_videoBitmap, 0, rect, 0);
-    }
+    canvas->drawBitmapRect(m_videoBitmap, 0, rect, 0);
 }
 
 bool MediaPlayerPrivateAndroidInpage::hasAvailableVideoFrame() const
@@ -393,7 +399,6 @@ MediaPlayerPrivateAndroidInpage::MediaPlayerPrivateAndroidInpage(MediaPlayer* pl
     , m_duration(0.f)
     , m_pendingWidth(0)
     , m_pendingHeight(0)
-    , m_pendingColorFormat(0)
     , m_shouldShowPoster(true)
     , m_visible(true)
     , m_prepared(false)
@@ -522,7 +527,7 @@ void MediaPlayerPrivateAndroidInpage::onMediaFormatChanged(MessagePacket* messag
 
     m_videoBitmap.reset();
 
-    if (m_pendingWidth && m_pendingHeight && m_pendingColorFormat
+    if (m_pendingWidth && m_pendingHeight
             && (static_cast<unsigned int>(NumFrameBuffer) == (m_reallocQueue.size() + m_frameQueue.size()))) {
         registerHeap();
     } else {
@@ -538,6 +543,11 @@ void MediaPlayerPrivateAndroidInpage::onMediaBufferReady(MessagePacket* messageP
     if (!m_hasVideo)
         return;
 
+    // second parameter indicates if buffer contains frame to be displayed or
+    // not, if not buffer is put on reallocation queue
+    if (!messagePtr->ext2())
+        m_reallocQueue.append(messagePtr->ext1());
+
     if (m_mp->isPlaying()) {
         while (!m_frameQueue.isEmpty()) {
             int frame = m_frameQueue.first();
@@ -552,18 +562,6 @@ void MediaPlayerPrivateAndroidInpage::onMediaBufferReady(MessagePacket* messageP
     }
 
     m_frameQueue.append(messagePtr->ext1());
-}
-
-void MediaPlayerPrivateAndroidInpage::onMediaBufferEmpty(MessagePacket* messagePtr)
-{
-    SLOGV("MEDIA_BUFFER_EMPTY(%i, %i)", messagePtr->ext1(), messagePtr->ext2());
-    m_reallocQueue.append(messagePtr->ext1());
-}
-
-void MediaPlayerPrivateAndroidInpage::onMediaBufferFormat(MessagePacket* messagePtr)
-{
-    SLOGV("MEDIA_BUFFER_FORMAT(%i, %i)", messagePtr->ext1(), messagePtr->ext2());
-    m_pendingColorFormat = messagePtr->ext1();
 }
 
 void MediaPlayerPrivateAndroidInpage::onUnhandledMessage(MessagePacket* messagePtr)
@@ -585,10 +583,14 @@ void MediaPlayerPrivateAndroidInpage::timerFired(Timer<MediaPlayerPrivateAndroid
             MPPS_MESSAGE_HANDLER(android::MEDIA_INFO, onMediaInfo);
             MPPS_MESSAGE_HANDLER(android::MEDIA_FORMAT_CHANGED, onMediaFormatChanged);
             MPPS_MESSAGE_HANDLER(android::MEDIA_BUFFER_READY, onMediaBufferReady);
-            MPPS_MESSAGE_HANDLER(android::MEDIA_BUFFER_EMPTY, onMediaBufferEmpty);
-            MPPS_MESSAGE_HANDLER(android::MEDIA_BUFFER_FORMAT, onMediaBufferFormat);
             MPPS_MESSAGE_UNHANDLED(onUnhandledMessage);
         MPPS_END_MESSAGE_MAP()
+    }
+
+    // after a resume(), m_frameHeap may not be allocated yet
+    if (m_visible && m_prepared && !m_realloc && !m_frameHeap.get()) {
+        SLOGV("beep");
+        registerHeap();
     }
 }
 
@@ -619,39 +621,39 @@ void MediaPlayerPrivateAndroidInpage::sendFrameToMediaPlayer(int index)
     CHECK_REPLY_SUCCESS(reply.readInt32());
 }
 
-void MediaPlayerPrivateAndroidInpage::registerHeap(bool alloc)
+void MediaPlayerPrivateAndroidInpage::registerHeap()
 {
-     if (!m_hasVideo)
+    if (!m_hasVideo)
         return;
+
+    if (m_pendingWidth) {
+        m_width = m_pendingWidth;
+        m_pendingWidth = 0;
+    }
+    if (m_pendingHeight) {
+        m_height = m_pendingHeight;
+        m_pendingHeight = 0;
+    }
+
+    updateColorFormat();
+
+    if (!m_width || !m_height)
+        return;
+
+    if (!m_colorFormat) {
+        SLOGW("received invalid color format from mediaplayer");
+        return;
+    }
 
     if (m_frameHeap.get()) {
         SLOGV("unregistering previous shared memory, frames %d, m_frameHeap ID %d, base %p, size %d", NumFrameBuffer, m_frameHeap->getHeapID(), m_frameHeap->getBase(), m_frameHeap->getSize());
         unregisterHeap();
     }
 
-    if (alloc) {
-        if (m_pendingWidth) {
-            m_width = m_pendingWidth;
-            m_pendingWidth = 0;
-        }
-        if (m_pendingHeight) {
-            m_height = m_pendingHeight;
-            m_pendingHeight = 0;
-        }
-        if (m_pendingColorFormat) {
-            m_colorFormat = m_pendingColorFormat;
-            m_pendingColorFormat = 0;
-        }
-        m_player->sizeChanged();
+    m_player->sizeChanged();
 
-        LOG_ASSERT(m_width, "Invalid width");
-        LOG_ASSERT(m_height, "Invalid height");
-        LOG_ASSERT(m_colorFormat, "Invalid color format");
-
-        m_frameSize = WKAccel::calcFrameSize(m_colorFormat, m_width, m_height); // tiled YUV or YUV420
-        m_frameHeap = new android::MemoryHeapBase(m_frameSize * NumFrameBuffer);
-    } else
-        m_frameHeap = new android::MemoryHeapBase(static_cast<size_t>(0));
+    m_frameSize = WKAccel::calcFrameSize(m_colorFormat, m_width, m_height); // tiled YUV or YUV420
+    m_frameHeap = new android::MemoryHeapBase(m_frameSize * NumFrameBuffer);
 
     SLOGV("m_frameHeap is (0x%08lX, %i bytes, 0x%08lX flags)", reinterpret_cast<long>(m_frameHeap->getBase()), m_frameHeap->getSize(), m_frameHeap->getFlags());
 
@@ -659,6 +661,7 @@ void MediaPlayerPrivateAndroidInpage::registerHeap(bool alloc)
     android::Parcel request;
     android::Parcel reply;
 
+    SLOGV("invoking MEDIA_INVOKE_REGISTER_BUFFERS for android::mediaplayer");
     CHECK_NETWORK_STATE(request.writeInterfaceToken(android::String16("android.media.IMediaPlayer")));
     CHECK_NETWORK_STATE(request.writeInt32(android::MEDIA_INVOKE_REGISTER_BUFFERS));
     CHECK_NETWORK_STATE(request.writeInt32(static_cast<int32_t>(NumFrameBuffer)));
@@ -668,19 +671,19 @@ void MediaPlayerPrivateAndroidInpage::registerHeap(bool alloc)
     CHECK_REPLY_SUCCESS(reply.readInt32());
 
     // Passing frame indexes to mediaplayer/stagefright.
-    if (alloc && m_visible)
-        for (int index = NumFrameBuffer; index; --index)
-            sendFrameToMediaPlayer(index-1);
+    for (int index = NumFrameBuffer; index; --index)
+        sendFrameToMediaPlayer(index-1);
 }
 
 void MediaPlayerPrivateAndroidInpage::unregisterHeap()
 {
-    if (!m_hasVideo)
+    if (!m_hasVideo || !m_frameHeap.get())
         return;
 
     android::Parcel request;
     android::Parcel reply;
 
+    SLOGV("invoking MEDIA_INVOKE_UNREGISTER_BUFFERS for android::mediaplayer");
     CHECK_NETWORK_STATE(request.writeInterfaceToken(android::String16("android.media.IMediaPlayer")));
     CHECK_NETWORK_STATE(request.writeInt32(android::MEDIA_INVOKE_UNREGISTER_BUFFERS));
     CHECK_NETWORK_STATE(m_mp->invoke(request, &reply));
@@ -705,6 +708,23 @@ void MediaPlayerPrivateAndroidInpage::yuvToRGBFrame(char* yuvFrame, char* rgbFra
 #endif
                             m_width,
                             m_height);
+}
+
+void MediaPlayerPrivateAndroidInpage::updateColorFormat()
+{
+     if (!m_hasVideo)
+        return;
+
+    android::Parcel request;
+    android::Parcel reply;
+
+    SLOGV("invoking MEDIA_INVOKE_QUERY_BUFFER_FORMAT for android::mediaplayer");
+    CHECK_NETWORK_STATE(request.writeInterfaceToken(android::String16("android.media.IMediaPlayer")));
+    CHECK_NETWORK_STATE(request.writeInt32(android::MEDIA_INVOKE_QUERY_BUFFER_FORMAT));
+    CHECK_NETWORK_STATE(m_mp->invoke(request, &reply));
+    m_colorFormat = reply.readInt32();
+    SLOGV("buffer format updated 0x%08lX", m_colorFormat);
+    CHECK_REPLY_SUCCESS(reply.readInt32());
 }
 
 #if USE(ACCELERATED_COMPOSITING)

@@ -156,19 +156,18 @@ private:
     void onMediaInfo(MessagePacket*);
     void onMediaFormatChanged(MessagePacket*);
     void onMediaBufferReady(MessagePacket*);
-    void onMediaBufferEmpty(MessagePacket*);
-    void onMediaBufferFormat(MessagePacket*);
     void onUnhandledMessage(MessagePacket*);
 
     void timerFired(Timer<MediaPlayerPrivateAndroidInpage>*);
     void setNetworkErrorState(android::status_t status);
     void sendFrameToMediaPlayer(int index);
-    void registerHeap(bool alloc = true);
+    void registerHeap();
     void unregisterHeap();
     void yuvToRGBFrame(char* yuvFrame, char* rgbFrame);
+    void updateColorFormat();
     char* getFramePtr(int index) const
     {
-        if (index >= NumFrameBuffer)
+        if (index >= NumFrameBuffer || !m_frameHeap.get())
             return 0;
 
         return static_cast<char*>(m_frameHeap->getBase()) + (index * m_frameSize);
@@ -199,7 +198,6 @@ private:
 
     int m_pendingWidth;
     int m_pendingHeight;
-    int m_pendingColorFormat;
     bool m_shouldShowPoster;
     bool m_visible;
     bool m_prepared;
