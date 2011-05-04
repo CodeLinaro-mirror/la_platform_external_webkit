@@ -31,6 +31,7 @@
 #ifndef WTF_Renderer_h
 #define WTF_Renderer_h
 
+#include "IntRect.h"
 #include "PictureSet.h"
 #include "SkBitmap.h"
 #include "SkRect.h"
@@ -46,13 +47,17 @@ class Renderer : public Noncopyable {
 public:
     // WebViewCore lifetime is guaranteed, so can use raw pointer
     static Renderer* createRenderer();
-    virtual ~Renderer() {};
+	virtual ~Renderer() {};
     virtual void release() = 0;
     virtual void setContent(const PictureSet&, SkRegion*, bool) = 0;
     virtual void clearContent() = 0;
     virtual void pause() = 0;
     virtual void finish() = 0;
     virtual bool drawContent(SkCanvas*, SkColor, bool, PictureSet&, bool&) = 0;
+    virtual void setContent(const SkPicture*, WebCore::IntRect&) = 0;
+#if ENABLE(GPU_ACCELERATED_SCROLLING)
+    virtual bool drawContentGL(PictureSet&, WebCore::IntRect&, SkRect&, float, SkColor color = SK_ColorWHITE) = 0;
+#endif
 
 };
 
