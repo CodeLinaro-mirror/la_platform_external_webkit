@@ -77,6 +77,7 @@
 #include "utils/RefBase.h"
 #include "utils/String16.h"
 #include "utils/String8.h"
+#include <limits>
 
 using namespace WTF;
 
@@ -167,9 +168,6 @@ void MediaPlayerPrivateAndroidInpage::load(const String& url)
 
     m_networkState = MediaPlayer::Loading;
     m_player->networkStateChanged();
-
-    m_readyState = MediaPlayer::HaveMetadata;
-    m_player->readyStateChanged();
 
     m_mp->prepareAsync();
 
@@ -385,7 +383,7 @@ MediaPlayerPrivateAndroidInpage::MediaPlayerPrivateAndroidInpage(MediaPlayer* pl
     , m_completed(false)
     , m_realloc(false)
     , m_seekTime(0.f)
-    , m_frameUsecsBuffered(0)
+    , m_framePercentBuffered(0)
 {
     m_timer.startRepeating(TimerFrequency);
 
@@ -412,6 +410,9 @@ void MediaPlayerPrivateAndroidInpage::onMediaPrepared(MessagePacket* messagePtr)
         m_duration = static_cast<float>(msec) / SecondsToMilliseconds;
         m_player->durationChanged();
     }
+
+    if (m_duration == 0.f)
+        m_duration = std::numeric_limits<float>::quiet_NaN();
 
     m_networkState = MediaPlayer::Loaded;
     m_player->networkStateChanged();
@@ -440,13 +441,8 @@ void MediaPlayerPrivateAndroidInpage::onMediaPlaybackComplete(MessagePacket* mes
 void MediaPlayerPrivateAndroidInpage::onMediaBufferingUpdate(MessagePacket* messagePtr)
 {
     // ext1 is percentage buffered in usec of total duration
-    SLOGV("MEDIA_BUFFERING_UPDATE buffered: %i usecs duration: %f", messagePtr->ext1(), duration());
-    m_frameUsecsBuffered = messagePtr->ext1();
-
-    // HaveEnoughData should mean we have frames coming in fast enough to
-    // maintain the playrate.
-    m_readyState = MediaPlayer::HaveEnoughData;
-    m_player->readyStateChanged();
+    SLOGV("MEDIA_BUFFERING_UPDATE buffered: %i percent, duration: %f", messagePtr->ext1(), duration());
+    m_framePercentBuffered = messagePtr->ext1();
 }
 
 void MediaPlayerPrivateAndroidInpage::onMediaSeekComplete(MessagePacket* messagePtr)
