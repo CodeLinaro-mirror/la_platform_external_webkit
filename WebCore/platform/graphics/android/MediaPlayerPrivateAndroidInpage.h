@@ -204,7 +204,7 @@ private:
     bool m_completed;
     bool m_realloc;
     float m_seekTime;
-    int32_t m_frameUsecsBuffered; // Amount of frames buffered by the media player expressed in usecs.
+    int32_t m_framePercentBuffered; // Amount of frames buffered by the media player expressed in percentage
 
     MessageQueue<MessagePacket> m_notifyQueue;
 
