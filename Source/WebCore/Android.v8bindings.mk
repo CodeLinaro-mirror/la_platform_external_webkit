@@ -201,6 +201,11 @@ LOCAL_SRC_FILES += \
 	bindings/v8/custom/V8AudioNodeCustom.cpp
 endif
 
+ifeq ($(DYNAMIC_SHARED_LIBV8SO), true)
+LOCAL_SRC_FILES += \
+	bindings/v8/custom/V8Float64ArrayCustom.cpp
+endif
+
 LOCAL_SRC_FILES += \
 	bindings/v8/custom/V8SharedWorkerCustom.cpp \
 	bindings/v8/custom/V8StorageCustom.cpp \

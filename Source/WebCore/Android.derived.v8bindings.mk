@@ -38,7 +38,7 @@ FEATURE_DEFINES := ENABLE_ORIENTATION_EVENTS=1 ENABLE_TOUCH_EVENTS=1 ENABLE_DATA
 FEATURE_DEFINES += V8_BINDING
 
 ifeq ($(DYNAMIC_SHARED_LIBV8SO), true)
-FEATURE_DEFINES += ENABLE_WORKERS=1 ENABLE_SHARED_WORKERS=1
+FEATURE_DEFINES += ENABLE_WORKERS=1 ENABLE_SHARED_WORKERS=1 ENABLE_FLOAT64ARRAY=1
 endif
 
 ifeq ($(ENABLE_SVG), true)
@@ -357,6 +357,7 @@ GEN := \
     $(intermediates)/bindings/V8CanvasRenderingContext2D.h \
     $(intermediates)/bindings/V8DataView.h \
     $(intermediates)/bindings/V8Float32Array.h \
+    $(intermediates)/bindings/V8Float64Array.h \
     $(intermediates)/bindings/V8Int8Array.h \
     $(intermediates)/bindings/V8Int16Array.h \
     $(intermediates)/bindings/V8Int32Array.h \
