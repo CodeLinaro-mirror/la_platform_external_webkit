@@ -64,12 +64,6 @@ ifneq ($(JAVASCRIPT_ENGINE),jsc)
   endif
 endif
 
-WEBCORE_ACCELERATED_SCROLLING := true
-
-ifeq ($(WEBCORE_ACCELERATED_SCROLLING),true)
-        WEBCORE_WEBKITACCEL := true
-endif
-
 BASE_PATH := $(call my-dir)
 include $(CLEAR_VARS)
 
@@ -179,6 +173,7 @@ LOCAL_C_INCLUDES := $(LOCAL_C_INCLUDES) \
 	$(base_intermediates)/WebCore/html \
 	$(base_intermediates)/WebCore/platform
 
+WEBCORE_ACCELERATED_SCROLLING := true
 ifeq ($(WEBCORE_ACCELERATED_SCROLLING),true)
 LOCAL_C_INCLUDES := $(LOCAL_C_INCLUDES) \
 	vendor/qcom/opensource/webkit/BackingStore
@@ -299,8 +294,6 @@ ifeq ($(WEBCORE_INPAGE_VIDEO),true)
   endif
 
   ifeq ($(WEBCORE_INPAGE_VIDEO),true)
-    WEBCORE_WEBKITACCEL := true
-
     LOCAL_CFLAGS += -DENABLE_INPAGE_VIDEO
 
     ifeq ($(WEBCORE_INPAGE_RGB565),true)
@@ -336,10 +329,6 @@ LOCAL_SHARED_LIBRARIES := \
 
 ifeq ($(WEBCORE_INSTRUMENTATION),true)
 LOCAL_SHARED_LIBRARIES += libhardware_legacy
-endif
-
-ifeq ($(WEBCORE_WEBKITACCEL),true)
-LOCAL_SHARED_LIBRARIES += libwebkitaccel
 endif
 
 ifeq ($(WEBCORE_INPAGE_VIDEO),true)
