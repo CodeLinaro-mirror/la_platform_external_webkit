@@ -33,6 +33,7 @@
 #if ENABLE(VIDEO) && ENABLE(INPAGE_VIDEO)
 
 #include "CString.h"
+#include "ColorConverter/ColorConverterAPI.h"
 #include "Deque.h"
 #include "GraphicsContext.h"
 #include "HashSet.h"
@@ -213,6 +214,10 @@ private:
 
     Deque<int> m_frameQueue;
     Deque<int> m_reallocQueue;
+
+    static void* s_library;
+    static WebTech::ColorConverter_t s_colorConverter;
+    static WebTech::CalcFrameSize_t s_calcFrameSize;
 };
 
 } // namespace WebCore
