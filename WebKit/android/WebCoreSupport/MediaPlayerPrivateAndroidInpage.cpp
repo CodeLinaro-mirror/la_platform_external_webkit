@@ -37,6 +37,7 @@
 #include "MediaPlayerPrivateAndroidInpage.h"
 
 #include "CString.h"
+#include "ColorConverter/ColorConverterAPI.h"
 #include "CurrentTime.h"
 #include "GraphicsContext.h"
 #if USE(ACCELERATED_COMPOSITING)
@@ -63,7 +64,6 @@
 #include "SkRect.h"
 #include "TimeRanges.h"
 #include "Timer.h"
-#include "WKAccel.h"
 #include "WebViewCore.h"
 #include "binder/MemoryHeapBase.h"
 #include "binder/Parcel.h"
@@ -77,6 +77,8 @@
 #include "utils/RefBase.h"
 #include "utils/String16.h"
 #include "utils/String8.h"
+#include <cutils/properties.h>
+#include <dlfcn.h>
 #include <limits>
 
 using namespace WTF;
@@ -111,8 +113,32 @@ namespace WebCore {
     if (status != android::NO_ERROR) \
         return setNetworkErrorState(android::INVALID_OPERATION);
 
+void* MediaPlayerPrivateAndroidInpage::s_library = 0;
+WebTech::ColorConverter_t MediaPlayerPrivateAndroidInpage::s_colorConverter = 0;
+WebTech::CalcFrameSize_t MediaPlayerPrivateAndroidInpage::s_calcFrameSize = 0;
+
 void MediaPlayerPrivateAndroidInpage::registerMediaEngine(MediaEngineRegistrar registrar)
 {
+    char libraryName[PROPERTY_VALUE_MAX];
+    property_get(WebTech::ColorConverterLibraryNameProperty, libraryName, WebTech::ColorConverterLibraryName);
+    if (!s_library) {
+        s_library = dlopen(libraryName, RTLD_LAZY);
+        if (!s_library) {
+            SLOGV("Failed to open acceleration library %s", libraryName);
+            return;
+        }
+        s_calcFrameSize = (WebTech::CalcFrameSize_t) dlsym(s_library, WebTech::CalcFrameSizeFuncName);
+        s_colorConverter = (WebTech::ColorConverter_t) dlsym(s_library, WebTech::ColorConverterFuncName);
+        if (!s_calcFrameSize || !s_colorConverter) {
+            dlclose(s_library);
+            s_library = 0;
+            SLOGV("Failed to find acceleration routines in library %s", libraryName);
+            return;
+        }
+        SLOGV("Loaded acceleration library %s", libraryName);
+        // once the library is opened and and its exported methods found, dlclose() is never called to close the library
+    }
+
     SLOGV("In-page video media engine registered");
     registrar(create, getMediaEngineType, getSupportedTypes, supportsType);
 }
@@ -627,7 +653,7 @@ void MediaPlayerPrivateAndroidInpage::registerHeap()
 
     m_player->sizeChanged();
 
-    m_frameSize = WKAccel::calcFrameSize(m_colorFormat, m_width, m_height); // tiled YUV or YUV420
+    m_frameSize = s_calcFrameSize(m_colorFormat, m_width, m_height); // tiled YUV or YUV420
     m_frameHeap = new android::MemoryHeapBase(m_frameSize * NumFrameBuffer);
 
     SLOGV("m_frameHeap is (0x%08lX, %i bytes, 0x%08lX flags)", reinterpret_cast<long>(m_frameHeap->getBase()), m_frameHeap->getSize(), m_frameHeap->getFlags());
@@ -673,16 +699,16 @@ void MediaPlayerPrivateAndroidInpage::unregisterHeap()
 
 void MediaPlayerPrivateAndroidInpage::yuvToRGBFrame(char* yuvFrame, char* rgbFrame)
 {
-    WKAccel::colorConverter(yuvFrame,
-                            m_colorFormat,
-                            rgbFrame,
+    s_colorConverter(yuvFrame,
+                     m_colorFormat,
+                     rgbFrame,
 #if ENABLE(INPAGE_RGB565)
-                            OMX_COLOR_Format16bitRGB565,
+                     OMX_COLOR_Format16bitRGB565,
 #else
-                            OMX_COLOR_Format32bitARGB8888,
+                     OMX_COLOR_Format32bitARGB8888,
 #endif
-                            m_width,
-                            m_height);
+                     m_width,
+                     m_height);
 }
 
 void MediaPlayerPrivateAndroidInpage::updateColorFormat()

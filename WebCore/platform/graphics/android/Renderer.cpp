@@ -153,21 +153,21 @@ class RendererImpl : public Renderer, public WebTech::IBackingStore::IUpdater {
         void init()
         {
             char pval[PROPERTY_VALUE_MAX];
-            property_get("debug.tbs.log", pval, "0");
+            property_get("persist.debug.tbs.log", pval, "0");
             s_log = atoi(pval);
-            property_get("debug.tbs.perf", pval, "0");
+            property_get("persist.debug.tbs.perf", pval, "0");
             s_logPerf = atoi(pval);
-            property_get("debug.tbs.enable", pval, "1");
+            property_get("persist.debug.tbs.enable", pval, "1");
             enableDraw = atoi(pval)? true : false;
-            property_get("debug.tbs.speculativeupdate", pval, "1");
+            property_get("persist.debug.tbs.speculative", pval, "1");
             enableSpeculativeUpdate = atoi(pval)? true : false;
-            property_get("debug.tbs.partialupdate", pval, "1");
+            property_get("persist.debug.tbs.partialupdate", pval, "1");
             enablePartialUpdate = atoi(pval)? true : false;
-            property_get("debug.tbs.partialrender", pval, "0");
+            property_get("persist.debug.tbs.partialrender", pval, "0");
             enablePartialRender = atoi(pval)? true : false;
-            property_get("debug.tbs.zoom", pval, "0");
+            property_get("persist.debug.tbs.zoom", pval, "0");
             enableZoom = atoi(pval)? true : false;
-            property_get("debug.tbs.split", pval, "0");
+            property_get("persist.debug.tbs.split", pval, "0");
             allowSplit = atoi(pval)? true : false;
             print();
         }
@@ -639,8 +639,32 @@ public:
         RendererConfig::getConfig()->init();
         m_doPartialRender = RendererConfig::getConfig()->enablePartialRender;
 #if ENABLE(GPU_ACCELERATED_SCROLLING)
-        m_2DRenderer = WebTech::createRenderer2D();
+        m_2DRenderer = m_createRenderer2D();
 #endif // GPU_ACCELERATED_SCROLLING
+
+        char libraryName[PROPERTY_VALUE_MAX];
+        property_get(WebTech::BackingStoreLibraryNameProperty, libraryName, WebTech::BackingStoreLibraryName);
+        m_library = dlopen(libraryName, RTLD_LAZY);
+        if (!m_library)
+            LOG_RENDER("Failed to open acceleration library %s", libraryName);
+        else {
+            m_createBackingStore = (WebTech::CreateBackingStore_t) dlsym(m_library, WebTech::CreateBackingStoreFuncName);
+            m_getBackingStoreVersion = (WebTech::GetBackingStoreVersion_t) dlsym(m_library, WebTech::GetBackingStoreVersionFuncName);
+#if ENABLE(GPU_ACCELERATED_SCROLLING)
+            m_createRenderer2D = (WebTech::CreateRenderer2D_t) dlsym(m_library, WebTech::CreateRenderer2DFuncName);
+#endif
+            if (!m_createBackingStore || !m_getBackingStoreVersion
+#if ENABLE(GPU_ACCELERATED_SCROLLING)
+                || !m_createRenderer2D
+#endif
+                ) {
+                dlclose(m_library);
+                m_library = 0;
+                LOG_RENDER("Failed to find acceleration routines in library %s", libraryName);
+            }
+            else
+                LOG_RENDER("Loaded acceleration library %s", libraryName);
+        }
     }
 
     ~RendererImpl()
@@ -665,6 +689,8 @@ public:
         if (m_2DRenderer)
             m_2DRenderer->release();
 #endif
+        if (m_library)
+            dlclose(m_library);
     }
 
     virtual void release()
@@ -1159,15 +1185,19 @@ private:
     bool RenderRequest(RenderTask& request)
     {
         bool result = false;
+
+        if (!m_library)
+            return false;
+
         if (!m_backingStore) {
-            const char* version = WebTech::getBackingStoreVersion();
+            const char* version = m_getBackingStoreVersion();
             LOG_RENDER("creating WebTech BackingStore - version %s", version);
             int vlen = strlen(WEBTECH_BACKINGSTORE_VERSION);
             int cmp = strncmp(version, WEBTECH_BACKINGSTORE_VERSION, vlen);
             if (cmp)
                 LOG_RENDER("WARNING:  WebTech BackingStore version is wrong. Looking for version %s", WEBTECH_BACKINGSTORE_VERSION);
 
-            m_backingStore = WebTech::createBackingStore(static_cast<WebTech::IBackingStore::IUpdater*>(this));
+            m_backingStore = m_createBackingStore(static_cast<WebTech::IBackingStore::IUpdater*>(this));
             if (m_backingStore) {
                 m_backingStore->setParam(WebTech::IBackingStore::LOG_DEBUG, s_log);
                 m_backingStore->setParam(WebTech::IBackingStore::LOG_PERFORMANCE, s_logPerf);
@@ -1490,6 +1520,12 @@ private:
     EGLSyncKHR m_syncObject;
 #endif // GPU_ACCELERATED_SCROLLING
     BackingStoreBuffer* m_bufferInUse;
+    void* m_library;
+    WebTech::CreateBackingStore_t m_createBackingStore;
+    WebTech::GetBackingStoreVersion_t m_getBackingStoreVersion;
+#if ENABLE(GPU_ACCELERATED_SCROLLING)
+    WebTech::CreateRenderer2D_t m_createRenderer2D;
+#endif
 };
 
 RendererImpl::RendererConfig* RendererImpl::RendererConfig::getConfig()
