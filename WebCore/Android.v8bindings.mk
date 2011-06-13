@@ -25,13 +25,8 @@
 
 LOCAL_CFLAGS += -DWTF_USE_V8=1
 
-ifeq ($(USE_DEFAULT_JS_ENGINE),true)
-	BINDING_C_INCLUDES := \
-		external/v8/include
-else
-	BINDING_C_INCLUDES := \
-		external/v8/v8_leading/include
-endif
+BINDING_C_INCLUDES := \
+	external/v8/include
 
 BINDING_C_INCLUDES += \
 	$(LOCAL_PATH)/bindings/v8 \
