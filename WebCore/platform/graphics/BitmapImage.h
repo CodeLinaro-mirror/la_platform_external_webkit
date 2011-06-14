@@ -2,6 +2,7 @@
  * Copyright (C) 2006 Samuel Weinig (sam.weinig@gmail.com)
  * Copyright (C) 2004, 2005, 2006 Apple Computer, Inc.  All rights reserved.
  * Copyright (C) 2008-2009 Torch Mobile, Inc.
+ * Copyright (C) 2011 Code Aurora Forum. All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions
@@ -31,6 +32,7 @@
 #include "Image.h"
 #include "Color.h"
 #include "IntSize.h"
+#include "FloatRect.h"
 
 #if PLATFORM(MAC)
 #include <wtf/RetainPtr.h>
@@ -63,6 +65,16 @@ namespace WTF {
 namespace WebCore {
 
 template <typename T> class Timer;
+
+#if PLATFORM(ANDROID)
+struct InvertedBitmapData : Noncopyable {
+    InvertedBitmapData(NativeImagePtr image, const FloatRect& srcRect);
+    ~InvertedBitmapData();
+
+    NativeImagePtr m_bitmapRef;
+    FloatRect m_srcRect;
+};
+#endif
 
 // ================================================
 // FrameData Class
@@ -158,6 +170,11 @@ public:
 
     virtual NativeImagePtr nativeImageForCurrentFrame() { return frameAtIndex(currentFrame()); }
 
+#if PLATFORM(ANDROID)
+    virtual void cacheInvertedBitmap(NativeImagePtr, const FloatRect&);
+    virtual NativeImagePtr invertedBitmapFromCache(const FloatRect& srcRect) const;
+#endif
+
 protected:
     enum RepetitionCountStatus {
       Unknown,    // We haven't checked the source's repetition count.
@@ -247,7 +264,10 @@ protected:
         return m_isSolidColor && m_currentFrame == 0;
     }
     virtual Color solidColor() const { return m_solidColor; }
-    
+
+#if PLATFORM(ANDROID)
+    Vector<OwnPtr<InvertedBitmapData> > m_invertedBitmaps;
+#endif
     ImageSource m_source;
     mutable IntSize m_size; // The size to use for the overall image (will just be the size of the first image).
     

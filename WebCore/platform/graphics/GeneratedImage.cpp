@@ -61,6 +61,7 @@ void GeneratedImage::drawPattern(GraphicsContext* context, const FloatRect& srcR
 
     // Fill with the gradient.
     GraphicsContext* graphicsContext = imageBuffer->context();
+    graphicsContext->setDisplayPowerSaveMode(context->displayPowerSaveMode());
     graphicsContext->fillRect(FloatRect(FloatPoint(), adjustedSize), *m_generator.get());
 
     // Grab the final image from the image buffer.

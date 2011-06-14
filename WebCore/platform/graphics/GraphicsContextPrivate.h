@@ -50,6 +50,7 @@ namespace WebCore {
 #if PLATFORM(CAIRO)
             , globalAlpha(1)
 #endif
+            , m_displayPowerSaveMode(false)
         {
         }
 
@@ -82,6 +83,7 @@ namespace WebCore {
 #elif PLATFORM(QT)
         TransformationMatrix pathTransform;
 #endif
+        bool m_displayPowerSaveMode;
     };
 
     class GraphicsContextPrivate : public Noncopyable {

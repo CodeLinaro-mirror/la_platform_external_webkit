@@ -139,6 +139,7 @@ Settings::Settings(Page* page)
 #ifdef ANDROID_PLUGINS
     , m_pluginsOnDemand(false)
 #endif
+    , m_displayAutoPowerSaveMode(false)
 {
     // A Frame may not have been created yet, so we initialize the AtomicString 
     // hash before trying to use it.
@@ -772,5 +773,10 @@ void Settings::setInpageVideoEnabled(bool enabled)
     m_inpageVideoEnabled = enabled;
 }
 #endif
+
+void Settings::setDisplayAutoPowerSaveMode(bool enabled)
+{
+    m_displayAutoPowerSaveMode = enabled;
+}
 
 } // namespace WebCore

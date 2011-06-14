@@ -442,10 +442,13 @@ void RenderImage::paintReplaced(PaintInfo& paintInfo, int tx, int ty)
 
 void RenderImage::paint(PaintInfo& paintInfo, int tx, int ty)
 {
+    bool powerSave = paintInfo.context->displayPowerSaveMode();
+    paintInfo.context->setDisplayPowerSaveMode(false);
     RenderReplaced::paint(paintInfo, tx, ty);
     
     if (paintInfo.phase == PaintPhaseOutline)
         paintFocusRings(paintInfo, style());
+    paintInfo.context->setDisplayPowerSaveMode(powerSave);
 }
     
 void RenderImage::paintFocusRings(PaintInfo& paintInfo, const RenderStyle* style)

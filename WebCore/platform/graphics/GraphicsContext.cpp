@@ -1,5 +1,6 @@
 /*
  * Copyright (C) 2003, 2004, 2005, 2006, 2009 Apple Inc. All rights reserved.
+ * Copyright (C) 2011 Code Aurora Forum. All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions
@@ -120,8 +121,13 @@ void GraphicsContext::setStrokeStyle(const StrokeStyle& style)
     setPlatformStrokeStyle(style);
 }
 
-void GraphicsContext::setStrokeColor(const Color& color, ColorSpace colorSpace)
+void GraphicsContext::setStrokeColor(const Color& origColor, ColorSpace colorSpace)
 {
+    Color color = origColor;
+
+    if (displayPowerSaveMode())
+        color = origColor.invert();
+
     m_common->state.strokeColor = color;
     m_common->state.strokeColorSpace = colorSpace;
     m_common->state.strokeGradient.clear();
@@ -184,8 +190,13 @@ void GraphicsContext::setFillRule(WindRule fillRule)
     m_common->state.fillRule = fillRule;
 }
 
-void GraphicsContext::setFillColor(const Color& color, ColorSpace colorSpace)
+void GraphicsContext::setFillColor(const Color& origColor, ColorSpace colorSpace)
 {
+    Color color = origColor;
+
+    if (displayPowerSaveMode())
+        color = origColor.invert();
+
     m_common->state.fillColor = color;
     m_common->state.fillColorSpace = colorSpace;
     m_common->state.fillGradient.clear();
@@ -479,6 +490,17 @@ void GraphicsContext::fillRect(const FloatRect& rect, Generator& generator)
         return;
     generator.fill(this, rect);
 }
+
+void GraphicsContext::setDisplayPowerSaveMode(bool flag)
+{
+    m_common->state.m_displayPowerSaveMode = flag;
+}
+
+bool GraphicsContext::displayPowerSaveMode() const
+{
+    return m_common->state.m_displayPowerSaveMode;
+}
+
 
 #if !(PLATFORM(SKIA) && !PLATFORM(ANDROID))
 void GraphicsContext::setPlatformFillGradient(Gradient*)

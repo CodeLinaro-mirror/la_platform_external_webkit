@@ -1,5 +1,6 @@
 /*
  * Copyright (C) 2003, 2004, 2005, 2006, 2008 Apple Inc. All rights reserved.
+ * Copyright (C) 2011 Code Aurora Forum. All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions
@@ -26,12 +27,16 @@
 #include "config.h"
 #include "Color.h"
 
+#include "CIELAB.h"
 #include "PlatformString.h"
 #include <math.h>
 #include <wtf/Assertions.h>
 #include <wtf/MathExtras.h>
 
 #include "ColorData.c"
+
+// CIELAB lightness component L* ranges between 0-100.
+#define CIELAB_LOW_LIGHTNESS_THRESHOLD  (50.0f)
 
 using namespace std;
 using namespace WTF;
@@ -252,6 +257,20 @@ Color Color::dark() const
                  static_cast<int>(multiplier * g * scaleFactor),
                  static_cast<int>(multiplier * b * scaleFactor),
                  alpha());
+}
+
+Color Color::invert() const
+{
+    CIELAB::initInversionTable();
+    return Color((m_color & 0xFF000000) | CIELAB::invert(m_color & 0x00FFFFFF));
+}
+
+bool Color::hasLowLightness() const
+{
+    CIELAB tmp(m_color);
+    if (tmp.L() < CIELAB_LOW_LIGHTNESS_THRESHOLD)
+        return true;
+    return false;
 }
 
 static int blendComponent(int c, int a)

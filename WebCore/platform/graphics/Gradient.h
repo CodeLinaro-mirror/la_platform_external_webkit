@@ -96,7 +96,7 @@ namespace WebCore {
         const Vector<ColorStop>& getStops() const;
 #else
 #if PLATFORM(ANDROID)
-        SkShader* getShader(SkShader::TileMode);
+        SkShader* getShader(SkShader::TileMode, bool inverted);
 #endif
         PlatformGradient platformGradient();
 #endif

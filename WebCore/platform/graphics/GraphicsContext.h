@@ -424,6 +424,8 @@ namespace WebCore {
 #if PLATFORM(HAIKU)
         pattern getHaikuStrokeStyle();
 #endif
+        void setDisplayPowerSaveMode(bool flag);
+        bool displayPowerSaveMode() const;
 
     private:
         void savePlatformState();

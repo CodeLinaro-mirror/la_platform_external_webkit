@@ -150,6 +150,8 @@ public:
 
 #if PLATFORM(ANDROID)
     virtual void setURL(const String& str) {}
+    virtual void cacheInvertedBitmap(NativeImagePtr, const FloatRect&) { }
+    virtual NativeImagePtr invertedBitmapFromCache(const FloatRect&) const { return 0; }
 #endif
 
 #if PLATFORM(GTK)

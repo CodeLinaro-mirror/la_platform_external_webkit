@@ -357,6 +357,8 @@ namespace WebCore {
         void setInpageVideoEnabled(bool);
         bool inpageVideoEnabled() const { return m_inpageVideoEnabled; }
 #endif
+        void setDisplayAutoPowerSaveMode(bool);
+        bool displayAutoPowerSaveMode() const { return m_displayAutoPowerSaveMode; }
 
     private:
         Page* m_page;
@@ -474,6 +476,7 @@ namespace WebCore {
 #if PLATFORM(ANDROID) && ENABLE(INPAGE_VIDEO)
         bool m_inpageVideoEnabled : 1;
 #endif
+        bool m_displayAutoPowerSaveMode : 1;
 
 #if USE(SAFARI_THEME)
         static bool gShouldPaintNativeControls;

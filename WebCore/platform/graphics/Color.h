@@ -107,6 +107,9 @@ public:
     Color blend(const Color&) const;
     Color blendWithWhite() const;
 
+    Color invert() const;
+    bool hasLowLightness() const;
+
 #if PLATFORM(QT)
     Color(const QColor&);
     operator QColor() const;

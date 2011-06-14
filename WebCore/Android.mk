@@ -426,6 +426,7 @@ LOCAL_SRC_FILES := $(LOCAL_SRC_FILES) \
 	platform/animation/AnimationList.cpp \
 	\
 	platform/graphics/BitmapImage.cpp \
+	platform/graphics/CIELAB.cpp \
 	platform/graphics/Color.cpp \
 	platform/graphics/FloatPoint.cpp \
 	platform/graphics/FloatPoint3D.cpp \

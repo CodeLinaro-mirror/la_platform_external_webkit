@@ -121,6 +121,7 @@ struct FieldIds {
         mUseDoubleTree = env->GetFieldID(clazz, "mUseDoubleTree", "Z");
         mPageCacheCapacity = env->GetFieldID(clazz, "mPageCacheCapacity", "I");
         mInpageVideoEnabled = env->GetFieldID(clazz, "mInpageVideoEnabled", "Z");
+        mDisplayAutoPowerSaveModeEnabled = env->GetFieldID(clazz, "mDisplayPowerSaveModeEnabled", "Z");
 
         LOG_ASSERT(mLayoutAlgorithm, "Could not find field mLayoutAlgorithm");
         LOG_ASSERT(mTextSize, "Could not find field mTextSize");
@@ -158,6 +159,7 @@ struct FieldIds {
         LOG_ASSERT(mUseDoubleTree, "Could not find field mUseDoubleTree");
         LOG_ASSERT(mPageCacheCapacity, "Could not find field mPageCacheCapacity");
         LOG_ASSERT(mInpageVideoEnabled, "Could not find field mInpageVideoEnabled");
+        LOG_ASSERT(mDisplayAutoPowerSaveModeEnabled, "Could not find field mDisplayPowerSaveModeEnabled");
 
         jclass c = env->FindClass("java/lang/Enum");
         LOG_ASSERT(c, "Could not find Enum class!");
@@ -204,6 +206,7 @@ struct FieldIds {
     jfieldID mUseDoubleTree;
     jfieldID mPageCacheCapacity;
     jfieldID mInpageVideoEnabled;
+    jfieldID mDisplayAutoPowerSaveModeEnabled;
     // Ordinal() method and value field for enums
     jmethodID mOrdinal;
     jfieldID  mTextSizeValue;
@@ -436,6 +439,9 @@ public:
         flag = env->GetBooleanField(obj, gFieldIds->mInpageVideoEnabled);
         s->setInpageVideoEnabled(flag);
 #endif
+
+        flag = env->GetBooleanField(obj, gFieldIds->mDisplayAutoPowerSaveModeEnabled);
+        s->setDisplayAutoPowerSaveMode(flag);
     }
 };
 

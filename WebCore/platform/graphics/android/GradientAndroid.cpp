@@ -1,5 +1,6 @@
 /*
  * Copyright 2006, The Android Open Source Project
+ * Copyright (C) 2011 Code Aurora Forum. All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions
@@ -37,12 +38,20 @@
 
 class PlatformGradientRec {
 public:
-    PlatformGradientRec() : m_shader(NULL) {}
-    ~PlatformGradientRec() { m_shader->safeUnref(); }
+    PlatformGradientRec()
+        : m_shader(NULL)
+        , m_invertedShader(NULL) {}
+
+    ~PlatformGradientRec()
+    {
+        m_shader->safeUnref();
+        m_invertedShader->safeUnref();
+    }
 
     SkShader*           m_shader;
     SkShader::TileMode  m_tileMode;
-    int                 m_colorCountWhenShaderWasBuilt;
+    SkShader*           m_invertedShader;
+    SkShader::TileMode  m_invertedTileMode;
 };
 
 namespace WebCore {
@@ -58,11 +67,13 @@ static U8CPU F2B(float x)
     return (int)(x * 255);
 }
 
-SkShader* Gradient::getShader(SkShader::TileMode mode)
+SkShader* Gradient::getShader(SkShader::TileMode mode, bool inverted)
 {
     if (NULL == m_gradient)
         m_gradient = new PlatformGradientRec;
-    else if (mode == m_gradient->m_tileMode)
+    else if (inverted && mode == m_gradient->m_invertedTileMode)
+        return m_gradient->m_invertedShader;
+    else if (!inverted && mode == m_gradient->m_tileMode)
         return m_gradient->m_shader;
 
     // need to ensure that the m_stops array is sorted. We call getColor()
@@ -83,7 +94,12 @@ SkShader* Gradient::getShader(SkShader::TileMode mode)
     Vector<ColorStop>::iterator iter = m_stops.begin();
     for (int i = 0; iter != m_stops.end(); i++) {
         pos[i] = SkFloatToScalar(iter->stop);
-        colors[i] = SkColorSetARGB(F2B(iter->alpha), F2B(iter->red),
+        if (inverted) {
+            Color c = Color(iter->red, iter->green, iter->blue, iter->alpha);
+            c = c.invert();
+            colors[i] = SkColorSetARGB(c.alpha(), c.red(), c.green(), c.blue());
+        } else
+            colors[i] = SkColorSetARGB(F2B(iter->alpha), F2B(iter->red),
                                    F2B(iter->green), F2B(iter->blue));
         ++iter;
     }
@@ -102,9 +118,15 @@ SkShader* Gradient::getShader(SkShader::TileMode mode)
         s = new SkColorShader(0);
 
     // zap our previous shader, if present
-    m_gradient->m_shader->safeUnref();
-    m_gradient->m_shader = s;
-    m_gradient->m_tileMode = mode;
+    if (inverted) {
+        m_gradient->m_invertedShader->safeUnref();
+        m_gradient->m_invertedShader = s;
+        m_gradient->m_invertedTileMode = mode;
+    } else {
+        m_gradient->m_shader->safeUnref();
+        m_gradient->m_shader = s;
+        m_gradient->m_tileMode = mode;
+    }
     SkMatrix matrix = m_gradientSpaceTransformation;
     s->setLocalMatrix(matrix);
 
@@ -119,8 +141,12 @@ void Gradient::fill(GraphicsContext* context, const FloatRect& rect)
     SkShader::TileMode mode = m_gradient ? m_gradient->m_tileMode :
                                             SkShader::kClamp_TileMode;
 
+    bool inverted = context->displayPowerSaveMode();
+    if(inverted && m_gradient)
+        mode = m_gradient->m_invertedTileMode;
+
     paint.setAntiAlias(true);
-    paint.setShader(this->getShader(mode));
+    paint.setShader(this->getShader(mode, inverted));
     android_gc2canvas(context)->drawRect(rect, paint);
 }
 

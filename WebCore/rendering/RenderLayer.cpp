@@ -1,5 +1,6 @@
 /*
  * Copyright (C) 2006, 2007, 2008 Apple Inc. All rights reserved.
+ * Copyright (C) 2011 Code Aurora Forum. All rights reserved.
  *
  * Portions are Copyright (C) 1998 Netscape Communications Corporation.
  *
@@ -59,6 +60,7 @@
 #include "FrameView.h"
 #include "Gradient.h"
 #include "GraphicsContext.h"
+#include "HTMLElement.h"
 #include "HTMLNames.h"
 #include "HitTestRequest.h"
 #include "HitTestResult.h"
@@ -2297,6 +2299,27 @@ void RenderLayer::paintLayer(RenderLayer* rootLayer, GraphicsContext* p,
     // We want to paint our layer, but only if we intersect the damage rect.
     bool shouldPaint = intersectsDamageRect(layerBounds, damageRect, rootLayer) && m_hasVisibleContent && isSelfPaintingLayer();
     if (shouldPaint && !selectionOnly && !damageRect.isEmpty()) {
+
+        // Invert the page color only if it's background color is lighter than 50% of CIELAB lightness.
+        if (renderer()->isRoot() && p->displayPowerSaveMode()
+            && renderer()->style()->visibility() == VISIBLE
+            && renderer()->hasBoxDecorations()
+            && (renderer() == paintingRootForRenderer || !paintingRootForRenderer)) {
+
+            Color bgColor = renderer()->style()->backgroundColor();
+            if (!renderer()->style()->hasBackground() && renderer()->node() && renderer()->node()->hasTagName(HTMLNames::htmlTag)) {
+                HTMLElement* body = renderer()->document()->body();
+                RenderObject* bodyObject = (body && body->hasLocalName(bodyTag)) ? body->renderer() : 0;
+
+                if (bodyObject && bodyObject->style()->hasBackground())
+                    bgColor = bodyObject->style()->backgroundColor();
+            }
+
+            if (bgColor.isValid() && bgColor.alpha() > 0 && bgColor.hasLowLightness()) {
+                p->setDisplayPowerSaveMode(false);
+            }
+        }
+
         // Begin transparency layers lazily now that we know we have to paint something.
         if (haveTransparency)
             beginTransparencyLayers(p, rootLayer, paintBehavior);

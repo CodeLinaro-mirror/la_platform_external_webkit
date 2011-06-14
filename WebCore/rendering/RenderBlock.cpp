@@ -3,6 +3,7 @@
  *           (C) 1999 Antti Koivisto (koivisto@kde.org)
  *           (C) 2007 David Smith (catfish.man@gmail.com)
  * Copyright (C) 2003, 2004, 2005, 2006, 2007, 2008, 2009, 2010 Apple Inc. All rights reserved.
+ * Copyright (c) 2011, Code Aurora Forum. All rights reserved.
  *
  * This library is free software; you can redistribute it and/or
  * modify it under the terms of the GNU Library General Public
@@ -1537,7 +1538,16 @@ void RenderBlock::repaintOverhangingFloats(bool paintAllDescendants)
         view()->enableLayoutState();
     }
 }
- 
+
+static inline bool excludeFromColorInversion(RenderBlock* obj)
+{
+    if ( obj && (obj->isRenderButton() || obj->isListBox() || obj->isMenuList()
+        || ((obj->isTextField() || obj->isTextArea()) && !obj->style()->backgroundColor().hasAlpha()) ))
+        return true ;
+
+    return false;
+}
+
 void RenderBlock::paint(PaintInfo& paintInfo, int tx, int ty)
 {
     tx += x();
@@ -1556,10 +1566,16 @@ void RenderBlock::paint(PaintInfo& paintInfo, int tx, int ty)
             return;
     }
 
+    bool powerSaveMode = paintInfo.context->displayPowerSaveMode();
+    if (excludeFromColorInversion(this))
+        paintInfo.context->setDisplayPowerSaveMode(false);
+
     bool pushedClip = pushContentsClip(paintInfo, tx, ty);
     paintObject(paintInfo, tx, ty);
     if (pushedClip)
         popContentsClip(paintInfo, phase, tx, ty);
+
+    paintInfo.context->setDisplayPowerSaveMode(powerSaveMode);
 
     // Our scrollbar widgets paint exactly when we tell them to, so that they work properly with
     // z-index.  We paint after we painted the background/border, so that the scrollbars will

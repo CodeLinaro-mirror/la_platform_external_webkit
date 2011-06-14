@@ -1,5 +1,6 @@
 /*
  * Copyright 2006, The Android Open Source Project
+ * Copyright (C) 2011 Code Aurora Forum. All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions
@@ -330,7 +331,7 @@ static SkShader::TileMode SpreadMethod2TileMode(GradientSpreadMethod sm) {
     return mode;
 }
 
-static void extactShader(SkPaint* paint, Pattern* pat, Gradient* grad)
+static void extactShader(SkPaint* paint, Pattern* pat, Gradient* grad, bool inverted)
 {
     if (pat) {
         // platformPattern() returns a cached obj
@@ -338,7 +339,7 @@ static void extactShader(SkPaint* paint, Pattern* pat, Gradient* grad)
     } else if (grad) {
         // grad->getShader() returns a cached obj
         GradientSpreadMethod sm = grad->spreadMethod();
-        paint->setShader(grad->getShader(SpreadMethod2TileMode(sm)));
+        paint->setShader(grad->getShader(SpreadMethod2TileMode(sm), inverted));
     }
 }
     
@@ -675,15 +676,21 @@ void GraphicsContext::fillRect(const FloatRect& rect)
 
     extactShader(&paint,
                  m_common->state.fillPattern.get(),
-                 m_common->state.fillGradient.get());
+                 m_common->state.fillGradient.get(),
+                 displayPowerSaveMode());
 
     GC2Canvas(this)->drawRect(rect, paint);
 }
 
-void GraphicsContext::fillRect(const FloatRect& rect, const Color& color, ColorSpace)
+void GraphicsContext::fillRect(const FloatRect& rect, const Color& origColor, ColorSpace)
 {
     if (paintingDisabled())
         return;
+
+    Color color = origColor;
+
+    if (displayPowerSaveMode())
+        color = origColor.invert();
 
     if (color.rgb() & 0xFF000000) {
         SkPaint paint;
@@ -1134,7 +1141,8 @@ void GraphicsContext::fillPath()
 
     extactShader(&paint,
                  m_common->state.fillPattern.get(),
-                 m_common->state.fillGradient.get());
+                 m_common->state.fillGradient.get(),
+                 displayPowerSaveMode());
 
     GC2Canvas(this)->drawPath(*path, paint);
 }
@@ -1150,7 +1158,8 @@ void GraphicsContext::strokePath()
 
     extactShader(&paint,
                  m_common->state.strokePattern.get(),
-                 m_common->state.strokeGradient.get());
+                 m_common->state.strokeGradient.get(),
+                 displayPowerSaveMode());
     
     GC2Canvas(this)->drawPath(*path, paint);
 }

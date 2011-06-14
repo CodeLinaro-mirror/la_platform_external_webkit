@@ -1,6 +1,7 @@
 /*
  * Copyright 2009, The Android Open Source Project
  * Copyright (C) 2004, 2005, 2006 Apple Computer, Inc.  All rights reserved.
+ * Copyright (C) 2011 Code Aurora Forum. All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions
@@ -27,6 +28,7 @@
 #include "config.h"
 #include "TransformationMatrix.h"
 #include "BitmapImage.h"
+#include "CIELAB.h"
 #include "Image.h"
 #include "FloatRect.h"
 #include "GraphicsContext.h"
@@ -59,7 +61,20 @@ android::AssetManager* globalAssetManager() {
 }
 
 namespace WebCore {
-    
+
+InvertedBitmapData::InvertedBitmapData(SkBitmapRef* image, const FloatRect& srcRect)
+    : m_bitmapRef(image)
+    , m_srcRect(srcRect)
+{
+    // Note: SkBitmapRef is created with ref count of 1, so no need to reference it again
+}
+
+InvertedBitmapData::~InvertedBitmapData()
+{
+    if (m_bitmapRef)
+        m_bitmapRef->unref();
+}
+
 bool FrameData::clear(bool clearMetadata)
 {
     if (clearMetadata)
@@ -89,6 +104,7 @@ BitmapImage::BitmapImage(SkBitmapRef* ref, ImageObserver* observer)
     , m_decodedSize(0)
     , m_haveFrameCount(true)
     , m_frameCount(1)
+    , m_invertedBitmaps(0)
 {
     initPlatformData();
     
@@ -109,6 +125,145 @@ void BitmapImage::initPlatformData()
 
 void BitmapImage::invalidatePlatformData()
 {
+    m_invertedBitmaps.clear();
+}
+
+void BitmapImage::cacheInvertedBitmap(SkBitmapRef* image, const FloatRect& srcRect)
+{
+    m_invertedBitmaps.append(new InvertedBitmapData(image, srcRect));
+}
+
+NativeImagePtr BitmapImage::invertedBitmapFromCache(const FloatRect& srcRect) const
+{
+    const size_t count = m_invertedBitmaps.size();
+    for (size_t i = 0; i < count; ++i) {
+        if(m_invertedBitmaps[i]->m_srcRect == srcRect)
+            return m_invertedBitmaps[i]->m_bitmapRef;
+    }
+    return 0;
+}
+
+static bool copyInvertedTo(const SkBitmap& src, SkBitmap& dst, SkBitmap::Allocator* allocator = 0)
+{
+    unsigned pixelCount = src.width()* src.height();
+    unsigned index = 0;
+
+    CIELAB::initInversionTable();
+    dst.setConfig(src.config(), src.width(), src.height(), src.rowBytes());
+
+    switch (src.config()) {
+    case SkBitmap::kIndex8_Config: {
+        SkAutoLockPixels alp(src);
+        SkColorTable* ctable = new SkColorTable(*(src.getColorTable()));
+        SkAutoUnref au(ctable);
+
+        pixelCount = ctable->count();
+        if (src.isOpaque()) {
+            unsigned* outPixel = ctable->lockColors();
+            for (unsigned i = 0; i <  pixelCount; i++) {
+                outPixel[index] = CIELAB::invert(outPixel[index]);
+                index ++;
+            }
+        } else {
+            unsigned char* outPixel = (unsigned char*)ctable->lockColors();
+            unsigned inverted = 0;
+            for (unsigned i = 0; i < pixelCount; i++) {
+                unsigned a = outPixel[index+3];
+                if (a != 0x00) {
+                    float alpha = a / 255.0f;
+                    inverted = CIELAB::invert((float)outPixel[index] / a,
+                                    (float)outPixel[index+1] / a,
+                                    (float)outPixel[index+2] / a);
+
+                    outPixel[index] = ((inverted >> 16) & 0xFF) * alpha;
+                    outPixel[index+1] = ((inverted >> 8) & 0xFF) * alpha;
+                    outPixel[index+2] = ((inverted) & 0xFF) * alpha;
+                }
+                index += 4;
+            }
+        }
+        ctable->unlockColors(true);
+
+        dst.allocPixels(allocator, ctable);
+        dst.setIsOpaque(src.isOpaque());
+        memcpy(dst.getPixels(), src.getPixels(), src.getSize());
+        break;
+    }
+    case SkBitmap::kRGB_565_Config: {
+        dst.allocPixels(allocator, NULL);
+        SkAutoLockPixels alp(src);
+        dst.setIsOpaque(src.isOpaque());
+        unsigned short* srcPixel = static_cast<unsigned short*>(src.getPixels());
+        unsigned short* outPixel = static_cast<unsigned short*>(dst.getPixels());
+        unsigned int invertedPixel = 0;
+        for (unsigned int i = 0; i < pixelCount; i++) {
+            outPixel[index] = CIELAB::invert(srcPixel[index]);
+            index ++;
+        }
+        break;
+    }
+    case SkBitmap::kARGB_8888_Config: {
+        dst.allocPixels(allocator, NULL);
+        SkAutoLockPixels alp(src);
+        bool srcIsOpaque = src.isOpaque();
+        dst.setIsOpaque(srcIsOpaque);
+
+        if (srcIsOpaque) {
+            unsigned* srcPixel = static_cast<unsigned*>(src.getPixels());
+            unsigned* outPixel = static_cast<unsigned*>(dst.getPixels());
+            for (unsigned i = 0; i < pixelCount; i++) {
+                outPixel[index] = CIELAB::invert(srcPixel[index]);
+                index ++;
+            }
+        } else {
+            unsigned char* srcPixel = static_cast<unsigned char*>(src.getPixels());
+            unsigned char* outPixel = static_cast<unsigned char*>(dst.getPixels());
+            unsigned int inverted = 0;
+            for (unsigned int i = 0; i < pixelCount; i++) {
+                unsigned int a = srcPixel[index+3];
+                if (a != 0x00) {
+                    float alpha = a / 255.0f;
+                    inverted = CIELAB::invert((float)srcPixel[index] / a,
+                                    (float)srcPixel[index+1] / a,
+                                    (float)srcPixel[index+2] / a);
+
+                    outPixel[index] = ((inverted >> 16) & 0xFF) * alpha;
+                    outPixel[index+1] = ((inverted >> 8) & 0xFF) * alpha;
+                    outPixel[index+2] = ((inverted) & 0xFF) * alpha;
+                    outPixel[index+3] = a;
+                } else {
+                    outPixel[index] = 0;
+                    outPixel[index+1] = 0;
+                    outPixel[index+2] = 0;
+                    outPixel[index+3] = 0;
+                }
+                index += 4;
+            }
+        }
+        break;
+    }
+    default:
+        SkDebugf("--- SkBitmap::copyInvertedTo Unsupported image format %d", src.config());
+        return false;
+        break;
+    }
+    return true;
+}
+
+static NativeImagePtr getInvertedBitmap(Image* img, const SkBitmap& bitmap, const FloatRect& srcRect)
+{
+    if (!img)
+        return 0;
+
+    SkBitmapRef* result = img->invertedBitmapFromCache(srcRect);
+    if (!result) {
+        SkBitmap inverted;
+        if (copyInvertedTo(bitmap, inverted)) {
+            result = new SkBitmapRef(inverted);
+            img->cacheInvertedBitmap(result, srcRect);
+        }
+    }
+    return result;
 }
 
 void BitmapImage::checkForSolidColor()
@@ -229,7 +384,17 @@ void BitmapImage::draw(GraphicsContext* ctxt, const FloatRect& dstRect,
     paint.setFilterBitmap(true);
     paint.setXfermodeMode(WebCoreCompositeToSkiaComposite(compositeOp));
     fixPaintForBitmapsThatMaySeam(&paint);
-    canvas->drawBitmapRect(bitmap, &srcR, dstR, &paint);
+
+    bool invertedBitmapDraw = false;
+    if (ctxt->displayPowerSaveMode()) {
+         SkBitmapRef* image = getInvertedBitmap(static_cast<Image*>(this), bitmap, srcRect);
+         if (image) {
+            canvas->drawBitmapRect(image->bitmap(), &srcR, dstR, &paint);
+            invertedBitmapDraw = true ;
+         }
+    }
+    if (!invertedBitmapDraw)
+        canvas->drawBitmapRect(bitmap, &srcR, dstR, &paint);
 
 #ifdef TRACE_SUBSAMPLED_BITMAPS
     if (bitmap.width() != image->origWidth() ||
@@ -289,6 +454,13 @@ void Image::drawPattern(GraphicsContext* ctxt, const FloatRect& srcRect,
     if (!origBitmap.extractSubset(&bitmap, srcR)) {
         SkDebugf("--- Image::drawPattern calling extractSubset failed\n");
         return;
+    }
+
+    if (ctxt->displayPowerSaveMode()) {
+        SkBitmap inverted;
+        SkBitmapRef* image = getInvertedBitmap(this, bitmap, srcRect);
+        if (image)
+            bitmap = image->bitmap();
     }
 
     SkCanvas*   canvas = ctxt->platformContext()->mCanvas;
