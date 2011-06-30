@@ -161,12 +161,12 @@ MediaPlayerPrivateAndroidInpage::~MediaPlayerPrivateAndroidInpage()
     m_timer.stop();
     m_notifyQueue.kill();
 
-    if (!m_prepared)
-        return;
+    if (m_prepared) {
+        unregisterHeap();
+        m_mp->suspend();
+        m_mp->stop();
+    }
 
-    unregisterHeap();
-    m_mp->suspend();
-    m_mp->stop();
     m_mp->setListener(0);
     m_mp->disconnect();
 }
@@ -589,7 +589,7 @@ void MediaPlayerPrivateAndroidInpage::timerFired(Timer<MediaPlayerPrivateAndroid
     }
 
     // after a resume(), m_frameHeap may not be allocated yet
-    if (m_visible && m_prepared && !m_realloc && !m_frameHeap.get()) {
+    if (m_hasVideo && m_visible && m_prepared && !m_realloc && !m_frameHeap.get()) {
         SLOGV("beep");
         registerHeap();
     }
@@ -745,7 +745,10 @@ android::sp<MediaPlayerPrivateAndroidInpage::WebCoreMediaPlayerListener> MediaPl
 void MediaPlayerPrivateAndroidInpage::WebCoreMediaPlayerListener::notify(int msg, int ext1, int ext2)
 {
     // notify is called by Android MediaPlayer thread -- notify is processed in the WebCore thread via the message queue
-    m_mpp->m_notifyQueue.append(MessagePacket::create(msg, ext1, ext2));
+    if (m_mpp->m_notifyQueue.killed())
+        SLOGW("trying to append message to queue in killed state");
+    else
+        m_mpp->m_notifyQueue.append(MessagePacket::create(msg, ext1, ext2));
 }
 
 PassOwnPtr<MediaPlayerPrivateAndroidInpage::MessagePacket> MediaPlayerPrivateAndroidInpage::MessagePacket::create(int msg, int ext1, int ext2)
