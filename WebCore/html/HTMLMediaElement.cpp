@@ -121,6 +121,7 @@ HTMLMediaElement::HTMLMediaElement(const QualifiedName& tagName, Document* doc)
 #if ENABLE(PLUGIN_PROXY_FOR_VIDEO)
     , m_needWidgetUpdate(false)
 #endif
+    , m_resendPausePlayEventIfNeeded(false)
 {
     document()->registerForDocumentActivationCallbacks(this);
     document()->registerForMediaVolumeCallbacks(this);
@@ -326,8 +327,13 @@ void HTMLMediaElement::asyncEventTimerFired(Timer<HTMLMediaElement>*)
 
     m_pendingEvents.swap(pendingEvents);
     unsigned count = pendingEvents.size();
-    for (unsigned ndx = 0; ndx < count; ++ndx) 
+    for (unsigned ndx = 0; ndx < count; ++ndx) {
+        if (m_resendPausePlayEventIfNeeded
+            && (pendingEvents[ndx]->type() == eventNames().playEvent
+             || pendingEvents[ndx]->type() == eventNames().pauseEvent))
+           m_resendPausePlayEventIfNeeded = false;
         dispatchEvent(pendingEvents[ndx].release(), ec);
+    }
 }
 
 void HTMLMediaElement::loadTimerFired(Timer<HTMLMediaElement>*)
@@ -488,6 +494,13 @@ void HTMLMediaElement::loadInternal()
 
     // 7 - Invoke the media element's resource selection algorithm.
     selectMediaResource();
+
+    if (m_resendPausePlayEventIfNeeded) {
+        if (m_paused)
+            scheduleEvent(eventNames().pauseEvent);
+        else
+            scheduleEvent(eventNames().playEvent);
+    }
     m_processingLoad = false;
 }
 
@@ -1159,6 +1172,12 @@ void HTMLMediaElement::playInternal()
     
     if (m_paused) {
         m_paused = false;
+        // If we are still waiting for source, then check on the status of
+        // the playEvent since the event notification could get cleared when
+        // the source is loaded.
+        if (m_loadState == WaitingForSource)
+            m_resendPausePlayEventIfNeeded = true;
+
         scheduleEvent(eventNames().playEvent);
 
         if (m_readyState <= HAVE_CURRENT_DATA)
@@ -1190,6 +1209,12 @@ void HTMLMediaElement::pauseInternal()
     
     if (!m_paused) {
         m_paused = true;
+        // If we are still waiting for source, then check on the status of
+        // the pauseEvent since the event notification could get cleared when
+        // the source is loaded.
+        if (m_loadState == WaitingForSource)
+            m_resendPausePlayEventIfNeeded = true;
+
         scheduleTimeupdateEvent(false);
         scheduleEvent(eventNames().pauseEvent);
     }
