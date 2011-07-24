@@ -32,7 +32,7 @@
 #if ENABLE(VIDEO) && ENABLE(INPAGE_VIDEO)
 
 #define LOG_TAG "MediaPlayerPrivateAndroidInpage"
-// #define LOG_NDEBUG 0
+#define LOG_NDEBUG 0
 
 #include "MediaPlayerPrivateAndroidInpage.h"
 
@@ -81,6 +81,11 @@
 #include <dlfcn.h>
 #include <limits>
 
+#define LOG_INPAGE(...) ((s_log) ? SLOGV(__VA_ARGS__) : (void)0)
+#define LOG_INPAGE4(...) ((s_log & 0x4) ? SLOGV(__VA_ARGS__) : (void)0)
+#define NOT_IMPLEMENTED() ((s_log & 0x2) ?  notImplemented() : (void)0)
+static int s_log = 0;
+
 using namespace WTF;
 
 namespace WebCore {
@@ -124,7 +129,7 @@ void MediaPlayerPrivateAndroidInpage::registerMediaEngine(MediaEngineRegistrar r
     if (!s_library) {
         s_library = dlopen(libraryName, RTLD_LAZY);
         if (!s_library) {
-            SLOGV("Failed to open acceleration library %s", libraryName);
+            LOG_INPAGE("Failed to open acceleration library %s", libraryName);
             return;
         }
         s_calcFrameSize = (WebTech::CalcFrameSize_t) dlsym(s_library, WebTech::CalcFrameSizeFuncName);
@@ -132,14 +137,14 @@ void MediaPlayerPrivateAndroidInpage::registerMediaEngine(MediaEngineRegistrar r
         if (!s_calcFrameSize || !s_colorConverter) {
             dlclose(s_library);
             s_library = 0;
-            SLOGV("Failed to find acceleration routines in library %s", libraryName);
+            LOG_INPAGE("Failed to find acceleration routines in library %s", libraryName);
             return;
         }
-        SLOGV("Loaded acceleration library %s", libraryName);
+        LOG_INPAGE("Loaded acceleration library %s", libraryName);
         // once the library is opened and and its exported methods found, dlclose() is never called to close the library
     }
 
-    SLOGV("In-page video media engine registered");
+    LOG_INPAGE("In-page video media engine registered");
     registrar(create, getMediaEngineType, getSupportedTypes, supportsType);
 }
 
@@ -157,7 +162,7 @@ MediaPlayer::SupportsType MediaPlayerPrivateAndroidInpage::supportsType(const St
 
 MediaPlayerPrivateAndroidInpage::~MediaPlayerPrivateAndroidInpage()
 {
-    SLOGV("destroying MediaPlayerPrivateAndroidInpage instance");
+    LOG_INPAGE("destroying MediaPlayerPrivateAndroidInpage instance");
     m_timer.stop();
     m_notifyQueue.kill();
 
@@ -181,16 +186,13 @@ void MediaPlayerPrivateAndroidInpage::load(const String& url)
     if (!cookie.isEmpty())
         headers.add(android::String8("Cookie"), android::String8(cookie.utf8().data()));
 
-    SLOGV("setting data source for android::mediaplayer (0x%08lX->0x%08lX,%s)", reinterpret_cast<long>(m_player), reinterpret_cast<long>(this), url.utf8().data());
+    LOG_INPAGE("setting data source for android::mediaplayer (0x%08lX->0x%08lX,%s)", reinterpret_cast<long>(m_player), reinterpret_cast<long>(this), url.utf8().data());
     CHECK_NETWORK_STATE(m_mp->setDataSource(url.utf8().data(), &headers));
     CHECK_NETWORK_STATE(m_mp->setListener(WebCoreMediaPlayerListener::create(this)));
 
     // TODO Should query the media player for this.
     m_hasAudio = true;
     m_hasVideo = m_player->mediaElementType() == MediaPlayer::Video;
-
-    if (m_hasVideo) // For video we need to update at 30 FPS.
-        m_timer.augmentRepeatInterval(VideoTimerFrequency - TimerFrequency);
 
     m_networkState = MediaPlayer::Loading;
     m_player->networkStateChanged();
@@ -204,7 +206,7 @@ void MediaPlayerPrivateAndroidInpage::load(const String& url)
 
 void MediaPlayerPrivateAndroidInpage::cancelLoad()
 {
-    notImplemented();
+    NOT_IMPLEMENTED();
 }
 
 void MediaPlayerPrivateAndroidInpage::play()
@@ -213,17 +215,25 @@ void MediaPlayerPrivateAndroidInpage::play()
         return;
 
     SLOGW("inpage video starting");
-    if (m_hasVideo && m_shouldShowPoster) {
-        m_shouldShowPoster = false;
-        static_cast<HTMLVideoElement*>(m_player->mediaPlayerClient())->updatePosterImage();
-    }
+    if (m_hasVideo) {
+        if (m_shouldShowPoster) {
+            m_shouldShowPoster = false;
+            static_cast<HTMLVideoElement*>(m_player->mediaPlayerClient())->updatePosterImage();
+        }
 
+        registerHeap();
+
+        // For video we need to update at 30 FPS.
+        m_timer.augmentRepeatInterval(VideoTimerFrequency - TimerFrequency);
+    }
     m_mp->start();
 }
 
 void MediaPlayerPrivateAndroidInpage::pause()
 {
     SLOGW("inpage video paused");
+    if (m_hasVideo)
+        m_timer.augmentRepeatInterval(TimerFrequency - VideoTimerFrequency);
     m_mp->pause();
 }
 
@@ -234,14 +244,15 @@ void MediaPlayerPrivateAndroidInpage::setVisible(bool b)
 
     m_visible = b;
     if (m_visible) {
-        SLOGV("visible -- resuming android::mediaplayer");
-        m_mp->resume();
-    } else if (m_prepared) {
-        unregisterHeap();
-        SLOGV("not visible -- suspending android::mediaplayer");
-        m_mp->suspend();
-    } else
-        SLOGV("not visible and not prepared");
+        LOG_INPAGE("visible -- resuming android::mediaplayer");
+        resume();
+    } else {
+        if (m_prepared) {
+            LOG_INPAGE("not visible -- suspending android::mediaplayer");
+            suspend();
+        } else
+            LOG_INPAGE("not visible and not prepared");
+    }
 }
 
 float MediaPlayerPrivateAndroidInpage::currentTime() const
@@ -258,7 +269,7 @@ float MediaPlayerPrivateAndroidInpage::currentTime() const
 
 void MediaPlayerPrivateAndroidInpage::seek(float seconds)
 {
-    SLOGV("seeking to %f seconds", seconds);
+    LOG_INPAGE("seeking to %f seconds", seconds);
     if (!m_prepared) {
         m_seekTime  = seconds;
         return;
@@ -275,7 +286,7 @@ void MediaPlayerPrivateAndroidInpage::seek(float seconds)
 
 void MediaPlayerPrivateAndroidInpage::setRate(float f)
 {
-    notImplemented();
+    NOT_IMPLEMENTED();
 }
 
 bool MediaPlayerPrivateAndroidInpage::paused() const
@@ -303,13 +314,13 @@ PassRefPtr<TimeRanges> MediaPlayerPrivateAndroidInpage::buffered() const
 
 unsigned MediaPlayerPrivateAndroidInpage::bytesLoaded() const
 {
-    notImplemented();
+    NOT_IMPLEMENTED();
     return 0;
 }
 
 void MediaPlayerPrivateAndroidInpage::setSize(const IntSize& size)
 {
-    notImplemented();
+    NOT_IMPLEMENTED();
 }
 
 void MediaPlayerPrivateAndroidInpage::paint(GraphicsContext* gc, const IntRect& rect)
@@ -326,10 +337,10 @@ void MediaPlayerPrivateAndroidInpage::paint(GraphicsContext* gc, const IntRect& 
 
     if (m_videoBitmap.empty()) {
 #if ENABLE(INPAGE_RGB565)
-        SLOGV("using RGB565 bitmaps");
+        LOG_INPAGE("using RGB565 bitmaps");
         m_videoBitmap.setConfig(SkBitmap::kRGB_565_Config, m_width, m_height);
 #else
-        SLOGV("using ARGB8888 bitmaps");
+        LOG_INPAGE("using ARGB8888 bitmaps");
         m_videoBitmap.setConfig(SkBitmap::kARGB_8888_Config, m_width, m_height);
 #endif
         m_videoBitmap.allocPixels();
@@ -416,20 +427,25 @@ MediaPlayerPrivateAndroidInpage::MediaPlayerPrivateAndroidInpage(MediaPlayer* pl
     m_mp = new android::MediaPlayer();
     LOG_ASSERT(m_mp.get(), "Failed to retrieve android MediaPlayer framework");
 
+    char value[PROPERTY_VALUE_MAX];
+    property_get("persist.debug.inpage_video.log", value, "0");
+    s_log = atoi(value);
+
     android::ProcessState::self()->startThreadPool();
 }
 
 void MediaPlayerPrivateAndroidInpage::onMediaNop(MessagePacket* messagePtr)
 {
-    SLOGV("MEDIA_NOP(%i, %i)", messagePtr->ext1(), messagePtr->ext2());
+    LOG_INPAGE("MEDIA_NOP(%i, %i)", messagePtr->ext1(), messagePtr->ext2());
 }
 
 void MediaPlayerPrivateAndroidInpage::onMediaPrepared(MessagePacket* messagePtr)
 {
-    SLOGV("MEDIA_PREPARED(%i, %i)", messagePtr->ext1(), messagePtr->ext2());
+    LOG_INPAGE("MEDIA_PREPARED(%i, %i)", messagePtr->ext1(), messagePtr->ext2());
     m_prepared = true;
 
-    registerHeap();
+    if (m_hasVideo)
+        registerHeap();
 
     int msec;
     if (android::NO_ERROR == m_mp->getDuration(&msec)) {
@@ -457,23 +473,29 @@ void MediaPlayerPrivateAndroidInpage::onMediaPrepared(MessagePacket* messagePtr)
 
 void MediaPlayerPrivateAndroidInpage::onMediaPlaybackComplete(MessagePacket* messagePtr)
 {
-    SLOGV("MEDIA_PLAYBACK_COMPLETE(%i, %i)", messagePtr->ext1(), messagePtr->ext2());
+    LOG_INPAGE("MEDIA_PLAYBACK_COMPLETE(%i, %i)", messagePtr->ext1(), messagePtr->ext2());
     // Notify client of end of stream
     m_completed = true;
 
+    if (m_hasVideo)
+        m_timer.augmentRepeatInterval(TimerFrequency - VideoTimerFrequency);
+    m_mp->pause();
     m_player->timeChanged();
 }
 
 void MediaPlayerPrivateAndroidInpage::onMediaBufferingUpdate(MessagePacket* messagePtr)
 {
     // ext1 is percentage buffered in usec of total duration
-    SLOGV("MEDIA_BUFFERING_UPDATE buffered: %i percent, duration: %f", messagePtr->ext1(), duration());
+    LOG_INPAGE("MEDIA_BUFFERING_UPDATE buffered: %i percent, duration: %f", messagePtr->ext1(), duration());
     m_framePercentBuffered = messagePtr->ext1();
+
+    m_networkState = MediaPlayer::Loaded;
+    m_player->networkStateChanged();
 }
 
 void MediaPlayerPrivateAndroidInpage::onMediaSeekComplete(MessagePacket* messagePtr)
 {
-    SLOGV("MEDIA_SEEK_COMPLETE(%i, %i)", messagePtr->ext1(), messagePtr->ext2());
+    LOG_INPAGE("MEDIA_SEEK_COMPLETE(%i, %i)", messagePtr->ext1(), messagePtr->ext2());
     m_seeking = false;
     m_player->timeChanged();
 
@@ -484,7 +506,7 @@ void MediaPlayerPrivateAndroidInpage::onMediaSeekComplete(MessagePacket* message
 
 void MediaPlayerPrivateAndroidInpage::onMediaSetVideoSize(MessagePacket* messagePtr)
 {
-    SLOGV("MEDIA_SET_VIDEO_SIZE(%i, %i)", messagePtr->ext1(), messagePtr->ext2());
+    LOG_INPAGE("MEDIA_SET_VIDEO_SIZE(%i, %i)", messagePtr->ext1(), messagePtr->ext2());
 
     if ((!messagePtr->ext1()) || (!messagePtr->ext2())) {
         m_hasVideo = false;
@@ -514,32 +536,40 @@ void MediaPlayerPrivateAndroidInpage::onMediaInfo(MessagePacket* messagePtr)
     SLOGW("MEDIA_INFO(%i, %i)", messagePtr->ext1(), messagePtr->ext2());
     /* ext1 framework error, ext2 implementation error */
 
-    if (android::MEDIA_INFO_BUFFERING_START == messagePtr->ext1())
+    if (android::MEDIA_INFO_BUFFERING_START == messagePtr->ext1()) {
         SLOGW("Temporarily pausing new frames while buffering more data");
+        m_networkState = MediaPlayer::Loading;
+        m_player->networkStateChanged();
+    }
 
-    if (android::MEDIA_INFO_BUFFERING_END == messagePtr->ext1())
+    if (android::MEDIA_INFO_BUFFERING_END == messagePtr->ext1()) {
         SLOGW("Resuming new frames");
+        m_networkState = MediaPlayer::Loaded;
+        m_player->networkStateChanged();
+    }
 }
 
 void MediaPlayerPrivateAndroidInpage::onMediaFormatChanged(MessagePacket* messagePtr)
 {
-    SLOGV("MEDIA_FORMAT_CHANGED(%i, %i)", messagePtr->ext1(), messagePtr->ext2());
+    LOG_INPAGE("MEDIA_FORMAT_CHANGED(%i, %i)", messagePtr->ext1(), messagePtr->ext2());
     m_realloc = true;
 
-    m_videoBitmap.reset();
+    if (m_hasVideo) {
+        m_videoBitmap.reset();
 
-    if (m_pendingWidth && m_pendingHeight
-            && (static_cast<unsigned int>(NumFrameBuffer) == (m_reallocQueue.size() + m_frameQueue.size()))) {
-        registerHeap();
-    } else {
-        SLOGV("missing buffers before reallocation, have %i+%i buffers", m_reallocQueue.size(), m_frameQueue.size());
-        m_notifyQueue.append(MessagePacket::create(messagePtr->msg(), messagePtr->ext1(), messagePtr->ext2()));
+        if (m_pendingWidth && m_pendingHeight
+                && (static_cast<unsigned int>(NumFrameBuffer) == (m_reallocQueue.size() + m_frameQueue.size()))) {
+            registerHeap();
+        } else {
+            LOG_INPAGE("missing buffers before reallocation, have %i+%i buffers", m_reallocQueue.size(), m_frameQueue.size());
+            m_notifyQueue.append(MessagePacket::create(messagePtr->msg(), messagePtr->ext1(), messagePtr->ext2()));
+        }
     }
 }
 
 void MediaPlayerPrivateAndroidInpage::onMediaBufferReady(MessagePacket* messagePtr)
 {
-    SLOGV("MEDIA_BUFFER_READY(%i, %i)", messagePtr->ext1(), messagePtr->ext2());
+    LOG_INPAGE4("MEDIA_BUFFER_READY(%i, %i)", messagePtr->ext1(), messagePtr->ext2());
 
     if (!m_hasVideo)
         return;
@@ -553,7 +583,7 @@ void MediaPlayerPrivateAndroidInpage::onMediaBufferReady(MessagePacket* messageP
         while (!m_frameQueue.isEmpty()) {
             int frame = m_frameQueue.first();
             m_frameQueue.removeFirst();
-            SLOGV("returning frame without painting");
+            LOG_INPAGE("returning frame without painting");
             sendFrameToMediaPlayer(frame);
         }
         m_player->repaint();
@@ -567,11 +597,13 @@ void MediaPlayerPrivateAndroidInpage::onMediaBufferReady(MessagePacket* messageP
 
 void MediaPlayerPrivateAndroidInpage::onUnhandledMessage(MessagePacket* messagePtr)
 {
-    SLOGV("UNKNOWN(%i, %i, %i)", messagePtr->msg(), messagePtr->ext1(), messagePtr->ext2());
+    LOG_INPAGE("UNKNOWN(%i, %i, %i)", messagePtr->msg(), messagePtr->ext1(), messagePtr->ext2());
 }
 
 void MediaPlayerPrivateAndroidInpage::timerFired(Timer<MediaPlayerPrivateAndroidInpage>*)
 {
+    LOG_INPAGE4("timer fired");
+
     while (OwnPtr<MessagePacket> messagePacket = m_notifyQueue.tryGetMessage()) {
         MPPS_BEGIN_MESSAGE_MAP(messagePacket)
             MPPS_MESSAGE_HANDLER(android::MEDIA_NOP, onMediaNop);
@@ -588,9 +620,8 @@ void MediaPlayerPrivateAndroidInpage::timerFired(Timer<MediaPlayerPrivateAndroid
         MPPS_END_MESSAGE_MAP()
     }
 
-    // after a resume(), m_frameHeap may not be allocated yet
-    if (m_hasVideo && m_visible && m_prepared && !m_realloc && !m_frameHeap.get()) {
-        SLOGV("beep");
+    if (m_hasVideo && m_mp->isPlaying() && !m_realloc && !m_frameHeap.get()) {
+        LOG_INPAGE("attempting to register shared memory heap");
         registerHeap();
     }
 }
@@ -647,7 +678,7 @@ void MediaPlayerPrivateAndroidInpage::registerHeap()
     }
 
     if (m_frameHeap.get()) {
-        SLOGV("unregistering previous shared memory, frames %d, m_frameHeap ID %d, base %p, size %d", NumFrameBuffer, m_frameHeap->getHeapID(), m_frameHeap->getBase(), m_frameHeap->getSize());
+        LOG_INPAGE("unregistering previous shared memory, frames %d, m_frameHeap ID %d, base %p, size %d", NumFrameBuffer, m_frameHeap->getHeapID(), m_frameHeap->getBase(), m_frameHeap->getSize());
         unregisterHeap();
     }
 
@@ -656,13 +687,13 @@ void MediaPlayerPrivateAndroidInpage::registerHeap()
     m_frameSize = s_calcFrameSize(m_colorFormat, m_width, m_height); // tiled YUV or YUV420
     m_frameHeap = new android::MemoryHeapBase(m_frameSize * NumFrameBuffer);
 
-    SLOGV("m_frameHeap is (0x%08lX, %i bytes, 0x%08lX flags)", reinterpret_cast<long>(m_frameHeap->getBase()), m_frameHeap->getSize(), m_frameHeap->getFlags());
+    LOG_INPAGE("m_frameHeap is (0x%08lX, %i bytes, 0x%08lX flags)", reinterpret_cast<long>(m_frameHeap->getBase()), m_frameHeap->getSize(), m_frameHeap->getFlags());
 
     // register shared memory
     android::Parcel request;
     android::Parcel reply;
 
-    SLOGV("invoking MEDIA_INVOKE_REGISTER_BUFFERS for android::mediaplayer");
+    LOG_INPAGE("invoking MEDIA_INVOKE_REGISTER_BUFFERS for android::mediaplayer");
     CHECK_NETWORK_STATE(request.writeInterfaceToken(android::String16("android.media.IMediaPlayer")));
     CHECK_NETWORK_STATE(request.writeInt32(android::MEDIA_INVOKE_REGISTER_BUFFERS));
     CHECK_NETWORK_STATE(request.writeInt32(static_cast<int32_t>(NumFrameBuffer)));
@@ -684,7 +715,7 @@ void MediaPlayerPrivateAndroidInpage::unregisterHeap()
     android::Parcel request;
     android::Parcel reply;
 
-    SLOGV("invoking MEDIA_INVOKE_UNREGISTER_BUFFERS for android::mediaplayer");
+    LOG_INPAGE("invoking MEDIA_INVOKE_UNREGISTER_BUFFERS for android::mediaplayer");
     CHECK_NETWORK_STATE(request.writeInterfaceToken(android::String16("android.media.IMediaPlayer")));
     CHECK_NETWORK_STATE(request.writeInt32(android::MEDIA_INVOKE_UNREGISTER_BUFFERS));
     CHECK_NETWORK_STATE(m_mp->invoke(request, &reply));
@@ -719,13 +750,49 @@ void MediaPlayerPrivateAndroidInpage::updateColorFormat()
     android::Parcel request;
     android::Parcel reply;
 
-    SLOGV("invoking MEDIA_INVOKE_QUERY_BUFFER_FORMAT for android::mediaplayer");
+    LOG_INPAGE("invoking MEDIA_INVOKE_QUERY_BUFFER_FORMAT for android::mediaplayer");
     CHECK_NETWORK_STATE(request.writeInterfaceToken(android::String16("android.media.IMediaPlayer")));
     CHECK_NETWORK_STATE(request.writeInt32(android::MEDIA_INVOKE_QUERY_BUFFER_FORMAT));
     CHECK_NETWORK_STATE(m_mp->invoke(request, &reply));
     m_colorFormat = reply.readInt32();
-    SLOGV("buffer format updated 0x%08lX", m_colorFormat);
+    LOG_INPAGE("buffer format updated 0x%08lX", m_colorFormat);
     CHECK_REPLY_SUCCESS(reply.readInt32());
+}
+
+void MediaPlayerPrivateAndroidInpage::suspend()
+{
+    LOG_INPAGE("inpage video suspending");
+    m_timer.stop();
+
+    if (m_prepared) {
+        if (m_mp->isPlaying()) {
+            m_mp->pause();
+        }
+        unregisterHeap();
+    }
+    m_mp->suspend();
+}
+
+static bool alwaysTruePredicate(MediaPlayerPrivateAndroidInpage::MessagePacket*)
+{
+    return true;
+}
+
+void MediaPlayerPrivateAndroidInpage::resume()
+{
+    LOG_INPAGE("inpage video resuming");
+    m_timer.startRepeating(TimerFrequency);
+
+    // Flush message queue
+    m_notifyQueue.removeIf(alwaysTruePredicate);
+
+    // Flush frame queue
+    m_frameQueue.clear();
+
+    m_mp->resume();
+
+    m_networkState = MediaPlayer::Loading;
+    m_player->networkStateChanged();
 }
 
 #if USE(ACCELERATED_COMPOSITING)

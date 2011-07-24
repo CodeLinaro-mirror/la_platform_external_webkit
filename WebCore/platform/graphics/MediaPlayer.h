@@ -250,6 +250,9 @@ public:
 
     bool hasSingleSecurityOrigin() const;
 
+    void suspend() const;
+    void resume() const;
+
 private:
     MediaPlayer(MediaPlayerClient*);
 
