@@ -121,6 +121,8 @@ public:
     virtual String url() const = 0;
 #endif
 
+    virtual void suspend() { }
+    virtual void resume() { }
 };
 
 }

@@ -61,6 +61,7 @@
 #include "HTMLInputElement.h"
 #include "HTMLLabelElement.h"
 #include "HTMLMapElement.h"
+#include "HTMLMediaElement.h"
 #include "HTMLNames.h"
 #include "HTMLOptGroupElement.h"
 #include "HTMLOptionElement.h"
@@ -72,6 +73,7 @@
 #include "KeyboardCodes.h"
 #include "Navigator.h"
 #include "loader.h"
+#include "MediaPlayer.h"
 #include "Node.h"
 #include "NodeList.h"
 #include "Page.h"
@@ -3186,6 +3188,34 @@ static bool PictureReady(JNIEnv* env, jobject obj)
     return GET_NATIVE_VIEW(env, obj)->pictureReady();
 }
 
+#if ENABLE(VIDEO) && ENABLE(INPAGE_VIDEO)
+static void MediaPlayerSuspend(WebCore::Document* document)
+{
+    // traverse the DOM tree and suspend any mediaplayers -- this is similar to
+    // method use to suspend geolocation except that geolocation traverses the
+    // frame tree not the DOM
+    for (Node* node = document; node; node = node->traverseNextNode())
+        if (node->hasTagName(WebCore::HTMLNames::audioTag) || node->hasTagName(WebCore::HTMLNames::videoTag)) {
+            MediaPlayer* player = static_cast<WebCore::HTMLMediaElement*>(node)->player();
+            if (player)
+                player->suspend();
+        }
+}
+
+static void MediaPlayerResume(WebCore::Document* document)
+{
+    // traverse the DOM tree and reusme any mediaplayers -- this is similar to
+    // method use to resume geolocation except that geolocation traverses the
+    // frame tree not the DOM
+    for (Node* node = document; node; node = node->traverseNextNode())
+        if (node->hasTagName(WebCore::HTMLNames::audioTag) || node->hasTagName(WebCore::HTMLNames::videoTag)) {
+            MediaPlayer* player = static_cast<WebCore::HTMLMediaElement*>(node)->player();
+            if (player)
+                player->resume();
+        }
+}
+#endif
+
 static void Pause(JNIEnv* env, jobject obj)
 {
     // This is called for the foreground tab when the browser is put to the
@@ -3221,6 +3251,9 @@ static void Pause(JNIEnv* env, jobject obj)
 #if ENABLE(ACCELERATED_SCROLLING)
     GET_NATIVE_VIEW(env, obj)->m_scrollRenderer->pause();
 #endif
+#if ENABLE(VIDEO) && ENABLE(INPAGE_VIDEO)
+    MediaPlayerSuspend(GET_NATIVE_VIEW(env, obj)->mainFrame()->document());
+#endif
 }
 
 static void Resume(JNIEnv* env, jobject obj)
@@ -3238,6 +3271,9 @@ static void Resume(JNIEnv* env, jobject obj)
     GET_NATIVE_VIEW(env, obj)->sendPluginEvent(event);
 
     GET_NATIVE_VIEW(env, obj)->setIsPaused(false);
+#if ENABLE(VIDEO) && ENABLE(INPAGE_VIDEO)
+    MediaPlayerResume(GET_NATIVE_VIEW(env, obj)->mainFrame()->document());
+#endif
 }
 
 static void FreeMemory(JNIEnv* env, jobject obj)

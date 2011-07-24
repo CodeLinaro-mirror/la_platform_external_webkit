@@ -688,6 +688,16 @@ MediaPlayer::MovieLoadType MediaPlayer::movieLoadType() const
     return m_private->movieLoadType();
 }
 
+void MediaPlayer::suspend() const
+{
+    return m_private->suspend();
+}
+
+void MediaPlayer::resume() const
+{
+    return m_private->resume();
+}
+
 // Client callbacks.
 void MediaPlayer::networkStateChanged()
 {
