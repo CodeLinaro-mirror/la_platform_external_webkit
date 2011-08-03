@@ -33,6 +33,7 @@ namespace WTF {
     // Unlike most of our smart pointers, OwnPtr can take either the pointer type or the pointed-to type.
 
     template <typename T> class PassOwnPtr;
+    template<typename T> PassOwnPtr<T> adoptPtr(T*);
 
     template <typename T> class OwnPtr : public Noncopyable {
     public:

@@ -236,7 +236,7 @@ public:
 
     bool isFinishedParsingChildren() const { return m_parsingChildrenFinished; }
     virtual void finishParsingChildren();
-    virtual void beginParsingChildren() { m_parsingChildrenFinished = false; }
+    virtual void beginParsingChildren();
 
     // ElementTraversal API
     Element* firstElementChild() const;

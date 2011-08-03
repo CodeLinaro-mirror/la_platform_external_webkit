@@ -380,6 +380,7 @@ public:
 #endif
     virtual bool isFrameSet() const { return false; }
     
+    CSSStyleSelector* styleSelectorIfExists() const { return m_styleSelector.get(); }
     CSSStyleSelector* styleSelector()
     { 
         if (!m_styleSelector)
