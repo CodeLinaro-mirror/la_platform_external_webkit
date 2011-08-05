@@ -89,6 +89,10 @@ public:
 #if ENABLE(INPAGE_VIDEO)
     virtual String url() const { return m_url; }
 #endif
+#if USE(ACCELERATED_COMPOSITING)
+    virtual bool supportsAcceleratedRendering() const { return true; }
+    virtual void acceleratedRenderingStateChanged() {}
+#endif
 
     virtual void onPrepared(int duration, int width, int height) { }
     void onEnded();
