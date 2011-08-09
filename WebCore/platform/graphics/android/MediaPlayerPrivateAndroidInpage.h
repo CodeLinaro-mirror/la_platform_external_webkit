@@ -165,6 +165,8 @@ private:
     void unregisterHeap();
     void yuvToRGBFrame(char* yuvFrame, char* rgbFrame);
     void updateColorFormat();
+    void suspend();
+    void resume();
     char* getFramePtr(int index) const
     {
         if (index >= NumFrameBuffer || !m_frameHeap.get())
