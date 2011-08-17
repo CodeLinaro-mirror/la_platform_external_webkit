@@ -173,9 +173,7 @@ LOCAL_C_INCLUDES := $(LOCAL_C_INCLUDES) \
 	$(base_intermediates)/WebCore/html \
 	$(base_intermediates)/WebCore/platform
 
-ifneq ($(QCOM_TARGET_PRODUCT),msm7627a)
-    WEBCORE_ACCELERATED_SCROLLING := true
-endif
+WEBCORE_ACCELERATED_SCROLLING := true
 
 ifeq ($(WEBCORE_ACCELERATED_SCROLLING),true)
 LOCAL_C_INCLUDES := $(LOCAL_C_INCLUDES) \
