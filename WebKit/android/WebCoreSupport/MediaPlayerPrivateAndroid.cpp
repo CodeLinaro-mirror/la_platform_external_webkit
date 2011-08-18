@@ -130,7 +130,7 @@ void MediaPlayerPrivate::prepareToPlay() {
 MediaPlayer::SupportsType MediaPlayerPrivate::supportsType(const String& type, const String& codecs)
 {
     if (WebViewCore::supportsMimeType(type))
-        return MediaPlayer::MayBeSupported;
+        return codecs.isEmpty() ? MediaPlayer::MayBeSupported : MediaPlayer::IsSupported;
     return MediaPlayer::IsNotSupported;
 }
 
