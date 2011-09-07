@@ -142,7 +142,7 @@ class RendererImpl : public Renderer, public WebTech::IBackingStore::IUpdater {
             , enablePartialUpdate(true)
             , enablePartialRender(false)
             , enableDraw(true)
-            , enableZoom(false)
+            , enableZoom(true)
         {
             if (enablePartialRender)
                 enablePartialUpdate = false;
