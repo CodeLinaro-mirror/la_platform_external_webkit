@@ -156,7 +156,7 @@ MediaPlayerPrivateInterface* MediaPlayerPrivateAndroidInpage::create(MediaPlayer
 MediaPlayer::SupportsType MediaPlayerPrivateAndroidInpage::supportsType(const String& type, const String& codecs)
 {
     if (android::WebViewCore::supportsMimeType(type))
-        return MediaPlayer::MayBeSupported;
+        return codecs.isEmpty() ? MediaPlayer::MayBeSupported : MediaPlayer::IsSupported;
     return MediaPlayer::IsNotSupported;
 }
 
