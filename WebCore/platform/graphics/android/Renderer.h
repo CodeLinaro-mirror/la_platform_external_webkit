@@ -31,15 +31,11 @@
 #ifndef WTF_Renderer_h
 #define WTF_Renderer_h
 
+#include "Color.h"
 #include "IntRect.h"
 #include "PictureSet.h"
 #include "SkBitmap.h"
 #include "SkRect.h"
-#include <wtf/HashSet.h>
-#include <wtf/MessageQueue.h>
-#include <wtf/PassOwnPtr.h>
-#include <wtf/Threading.h>
-#include <wtf/Vector.h>
 
 namespace android {
 
@@ -49,6 +45,8 @@ public:
     static Renderer* createRenderer();
 	virtual ~Renderer() {};
     virtual void release() = 0;
+    virtual void enable(bool) = 0;
+    virtual bool enabled() = 0;
     virtual void setContent(const PictureSet&, SkRegion*, bool) = 0;
     virtual void clearContent() = 0;
     virtual void pause() = 0;
@@ -56,9 +54,10 @@ public:
     virtual bool drawContent(SkCanvas*, SkColor, bool, PictureSet&, bool&) = 0;
     virtual void setContent(const SkPicture*, WebCore::IntRect&) = 0;
 #if ENABLE(GPU_ACCELERATED_SCROLLING)
-    virtual bool drawContentGL(PictureSet&, WebCore::IntRect&, SkRect&, float, SkColor color = SK_ColorWHITE) = 0;
+    virtual bool drawContentGL(PictureSet&, WebCore::IntRect&, SkRect&, float, WebCore::Color) = 0;
+    virtual void displayFPS(int ix, int iy, int iwidth, int iheight) = 0;
 #endif
-
+    virtual void setAlphaBlending(bool) = 0;
 };
 
 } // namespace android
