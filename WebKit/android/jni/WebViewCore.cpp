@@ -2511,8 +2511,11 @@ void WebViewCore::setBackgroundColor(SkColor c)
     view->setBaseBackgroundColor(bcolor);
 
     // Background color of 0 indicates we want a transparent background
-    if (c == 0)
+    if (c == 0) {
         view->setTransparent(true);
+        m_scrollRenderer->setAlphaBlending(true);
+    } else
+        m_scrollRenderer->setAlphaBlending(false);
 }
 
 void WebViewCore::setColorInversion(bool invert)

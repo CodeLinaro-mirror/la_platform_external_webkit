@@ -46,16 +46,18 @@
 #include "SkDrawFilter.h"
 #include "SkPaint.h"
 #include "SkPaintFlagsDrawFilter.h"
+#include "SkPicture.h"
 #include "SkPoint.h"
 #include "SkProxyCanvas.h"
 #include "SkShader.h"
 #include "SkTypeface.h"
 #include "SkXfermode.h"
-#include "WebViewCore.h"
 #include <cutils/log.h>
 #include <cutils/properties.h>
 #include <dlfcn.h>
 #include <stdio.h>
+#include <wtf/PassOwnPtr.h>
+#include <wtf/Threading.h>
 
 #if ENABLE(GPU_ACCELERATED_SCROLLING)
 #include <surfaceflinger/ISurfaceComposer.h>
@@ -96,7 +98,7 @@ namespace RendererImplNamespace {
 static void checkGlError(const char* op) {
     for (GLint error = glGetError(); error; error
         = glGetError()) {
-            LOG_RENDER("after %s() glError (0x%x)", op, error);
+            SLOGE("%s() returns glerror (0x%x)", op, error);
     }
 }
 #endif
@@ -117,7 +119,8 @@ class RendererImpl : public Renderer, public WebTech::IBackingStore::IUpdater {
             : valid(false)
         {
         }
-        SkColor color;
+        SkColor viewColor;
+        WebCore::Color pageBackgroundColor;
         bool invertColor;
         WebTech::IBackingStore::UpdateRegion requestArea; // requested valid region in content space.
         float contentScale;
@@ -132,6 +135,8 @@ class RendererImpl : public Renderer, public WebTech::IBackingStore::IUpdater {
         bool useGL;
         bool needGLSync;
         bool needRedraw;
+        bool scrolling;
+        bool zooming;
     };
 
     struct RendererConfig {
@@ -140,12 +145,14 @@ class RendererImpl : public Renderer, public WebTech::IBackingStore::IUpdater {
             , allowSplit(true)
             , splitSize(50)
             , enablePartialUpdate(true)
-            , enablePartialRender(false)
+            , enablePartialRender(true)
             , enableDraw(true)
             , enableZoom(true)
+            , enableFPSDisplay(false)
+            , interactiveZoomDelayUpdate(10)
+            , interactiveScrollStart(2)
+            , interactiveScrollEnd(2)
         {
-            if (enablePartialRender)
-                enablePartialUpdate = false;
         }
 
         static RendererConfig* getConfig();
@@ -153,22 +160,49 @@ class RendererImpl : public Renderer, public WebTech::IBackingStore::IUpdater {
         void init()
         {
             char pval[PROPERTY_VALUE_MAX];
-            property_get("persist.debug.tbs.log", pval, "0");
+            char ival[PROPERTY_VALUE_MAX];
+            property_get("persist.debug.tbs.log", pval, s_log? "1" : "0");
             s_log = atoi(pval);
-            property_get("persist.debug.tbs.perf", pval, "0");
+            property_get("debug.tbs.log", pval, s_log? "1" : "0");
+            s_log = atoi(pval);
+            property_get("persist.debug.tbs.perf", pval, s_logPerf? "1" : "0");
             s_logPerf = atoi(pval);
-            property_get("persist.debug.tbs.enable", pval, "1");
+            property_get("debug.tbs.perf", pval, s_logPerf? "1" : "0");
+            s_logPerf = atoi(pval);
+            property_get("persist.debug.tbs.fps", pval, enableFPSDisplay? "1" : "0");
+            enableFPSDisplay = atoi(pval);
+            property_get("debug.tbs.fps", pval, enableFPSDisplay? "1" : "0");
+            enableFPSDisplay = atoi(pval);
+            property_get("persist.debug.tbs.enable", pval, enableDraw? "1" : "0");
             enableDraw = atoi(pval)? true : false;
-            property_get("persist.debug.tbs.speculative", pval, "1");
+            property_get("debug.tbs.enable", pval, enableDraw? "1" : "0");
+            enableDraw = atoi(pval)? true : false;
+            property_get("persist.debug.tbs.speculative", pval, enableSpeculativeUpdate? "1" : "0");
             enableSpeculativeUpdate = atoi(pval)? true : false;
-            property_get("persist.debug.tbs.partialupdate", pval, "1");
+            property_get("debug.tbs.speculative", pval, enableSpeculativeUpdate? "1" : "0");
+            enableSpeculativeUpdate = atoi(pval)? true : false;
+            property_get("persist.debug.tbs.partialupdate", pval, enablePartialUpdate? "1" : "0");
             enablePartialUpdate = atoi(pval)? true : false;
-            property_get("persist.debug.tbs.partialrender", pval, "0");
+            property_get("debug.tbs.partialupdate", pval, enablePartialUpdate? "1" : "0");
+            enablePartialUpdate = atoi(pval)? true : false;
+            property_get("persist.debug.tbs.partialrender", pval, enablePartialRender? "1" : "0");
             enablePartialRender = atoi(pval)? true : false;
-            property_get("persist.debug.tbs.zoom", pval, "0");
+            property_get("debug.tbs.partialrender", pval, enablePartialRender? "1" : "0");
+            enablePartialRender = atoi(pval)? true : false;
+            property_get("persist.debug.tbs.zoom", pval, enableZoom? "1" : "0");
             enableZoom = atoi(pval)? true : false;
-            property_get("persist.debug.tbs.split", pval, "0");
+            property_get("debug.tbs.zoom", pval, enableZoom? "1" : "0");
+            enableZoom = atoi(pval)? true : false;
+            property_get("persist.debug.tbs.split", pval, allowSplit? "1" : "0");
             allowSplit = atoi(pval)? true : false;
+            property_get("debug.tbs.split", pval, allowSplit? "1" : "0");
+            allowSplit = atoi(pval)? true : false;
+            sprintf(ival, "%d", interactiveZoomDelayUpdate);
+            property_get("persist.debug.tbs.zoomdelay", pval, ival);
+            interactiveZoomDelayUpdate = atoi(pval);
+            sprintf(ival, "%d", interactiveZoomDelayUpdate);
+            property_get("debug.tbs.zoomdelay", pval, ival);
+            interactiveZoomDelayUpdate = atoi(pval);
             print();
         }
 
@@ -181,6 +215,8 @@ class RendererImpl : public Renderer, public WebTech::IBackingStore::IUpdater {
             LOG_RENDER("    enablePartialRender = %d", enablePartialRender? 1 : 0);
             LOG_RENDER("    enableZoom = %d", enableZoom? 1 : 0);
             LOG_RENDER("    allowSplit = %d", allowSplit? 1 : 0);
+            LOG_RENDER("    fpsDisplay = %d", enableFPSDisplay? 1 : 0);
+            LOG_RENDER("    zoomDelay = %d", interactiveZoomDelayUpdate);
         }
 
         bool enableSpeculativeUpdate; // allow speculative update
@@ -190,11 +226,15 @@ class RendererImpl : public Renderer, public WebTech::IBackingStore::IUpdater {
         bool enablePartialRender;
         bool enableDraw; // enable the backing store
         bool enableZoom; // allow fast zooming using the backing store
+        bool enableFPSDisplay; // display FPS
+        int interactiveZoomDelayUpdate; // num of frames after an interactive zoom before doing a fullscreen update
+        int interactiveScrollStart;
+        int interactiveScrollEnd;
     };
 
 #if ENABLE(GPU_ACCELERATED_SCROLLING)
 
-#define NUM_GL_RESOURCE_RENDERERS 1
+#define NUM_GL_RESOURCE_RENDERERS 2
 
 
     class GLResourceUsers {
@@ -226,7 +266,7 @@ class RendererImpl : public Renderer, public WebTech::IBackingStore::IUpdater {
     public:
         BackingStoreBuffer(int w, int h, int bpp
 #if ENABLE(GPU_ACCELERATED_SCROLLING)
-            , IGraphicBufferAlloc* allocator
+            , bool textureMemory
 #endif // GPU_ACCELERATED_SCROLLING
             )
             : m_refCount(1)
@@ -234,27 +274,40 @@ class RendererImpl : public Renderer, public WebTech::IBackingStore::IUpdater {
             , m_eglImage(0)
             , m_eglDisplay(0)
             , m_textureName(0)
+            , m_context(0)
+            , m_tid(0)
+            , m_next(0)
 #endif // GPU_ACCELERATED_SCROLLING
         {
 #if ENABLE(GPU_ACCELERATED_SCROLLING)
-            LOG_RENDER("BackingStoreBuffer constructor.  allocator = %p", allocator);
+            LOG_RENDER("BackingStoreBuffer constructor.  texture = %s", textureMemory? "true" : "false");
 #endif // GPU_ACCELERATED_SCROLLING
             SkBitmap::Config config = bppToConfig(bpp);
             int stride = 0;
 
 #if ENABLE(GPU_ACCELERATED_SCROLLING)
-            if (allocator) {
-                int format = bppToGraphicBufferFormat(bpp);
-                LOG_RENDER("creating GraphicBuffer w = %d, h = %d", w, h);
-                m_graphicBuffer = allocator->createGraphicBuffer(w, h, format,
-                    GraphicBuffer::USAGE_HW_TEXTURE |
-                    GRALLOC_USAGE_SW_READ_OFTEN | GRALLOC_USAGE_SW_WRITE_OFTEN);
-                if (m_graphicBuffer == 0) {
-                    LOG_RENDER("Error: cannot allocate GraphicBuffer");
+            if (textureMemory) {
+                sp<ISurfaceComposer> composer = (ComposerService::getComposerService());
+                if (composer == 0) {
+                    SLOGE("BackingStoreBuffer: cannot create composer");
                 }
-                if (m_graphicBuffer != 0) {
-                    stride = m_graphicBuffer->getStride() * 4;
-                    LOG_RENDER("GraphicBuffer width = %d, stride = %d", m_graphicBuffer->getWidth(), stride);
+                m_graphicBufferAlloc = composer->createGraphicBufferAlloc();
+                if (m_graphicBufferAlloc == 0) {
+                    SLOGE("BackingStoreBuffer: cannot create GraphicBufferAlloc");
+                }
+                else {
+                    int format = bppToGraphicBufferFormat(bpp);
+                    LOG_RENDER("creating GraphicBuffer w = %d, h = %d", w, h);
+                    m_graphicBuffer = m_graphicBufferAlloc->createGraphicBuffer(w, h, format,
+                        GraphicBuffer::USAGE_HW_TEXTURE |
+                        GRALLOC_USAGE_SW_READ_OFTEN | GRALLOC_USAGE_SW_WRITE_OFTEN);
+                    if (m_graphicBuffer == 0) {
+                        SLOGE("BackingStoreBuffer: Error: cannot allocate GraphicBuffer. num buffers remaining: %d, in delete list: %d, num renderers: %d", s_numBuffers, numBuffersInDeleteList(), s_numRenderers);
+                    }
+                    if (m_graphicBuffer != 0) {
+                        stride = m_graphicBuffer->getStride() * bpp;
+                        LOG_RENDER("GraphicBuffer width = %d, stride = %d", m_graphicBuffer->getWidth(), stride);
+                    }
                 }
             }
 #endif // GPU_ACCELERATED_SCROLLING
@@ -268,7 +321,7 @@ class RendererImpl : public Renderer, public WebTech::IBackingStore::IUpdater {
 
             ++s_numBuffers;
 
-            static unsigned int s_id;
+            static unsigned int s_id = 0;
             m_id = ++s_id;
             if (s_id <= 0)
                 s_id = 1;
@@ -279,8 +332,31 @@ class RendererImpl : public Renderer, public WebTech::IBackingStore::IUpdater {
         virtual ~BackingStoreBuffer()
         {
 #if ENABLE(GPU_ACCELERATED_SCROLLING)
+            pid_t tid = gettid();
+            if ((m_textureName || m_eglImage) && m_tid != 0 && tid != m_tid) {
+                SLOGE("~BackingStoreBuffer not called in UI thread");
+            }
+            if (m_textureName) {
+                EGLContext ctx = eglGetCurrentContext();
+                if (ctx != m_context) {
+                    SLOGE("~BackingStoreBuffer context changed");
+                }
+                glDeleteTextures(1, &m_textureName);
+            }
             if (m_eglImage) {
                 eglDestroyImageKHR(m_eglDisplay, m_eglImage);
+            }
+            if (m_graphicBufferAlloc != 0)
+                m_graphicBufferAlloc->freeAllGraphicBuffersExcept(-1);
+
+            if (s_log) {
+                int gbCount = 0, gballocCount = 0;
+                if (m_graphicBuffer != 0)
+                    gbCount = m_graphicBuffer->getStrongCount();
+                if (m_graphicBufferAlloc != 0)
+                    gballocCount = m_graphicBufferAlloc->getStrongCount();
+
+                SLOGV("~BackingStoreBuffer - graphicBuffer refcount = %d.  allocator ref count = %d", gbCount, gballocCount);
             }
 #endif // GPU_ACCELERATED_SCROLLING
 
@@ -295,9 +371,14 @@ class RendererImpl : public Renderer, public WebTech::IBackingStore::IUpdater {
             // But in GPU mode, the UI thread also add reference to the buffer because
             // the GPU may be using the buffer.  So only if GPU is used this function need
             // to be thread safe.
-            MutexLocker locker(m_mutex);
+            MutexLocker locker(s_mutex);
 #endif
             ++m_refCount;
+        }
+
+        int getRefCount()
+        {
+            return m_refCount;
         }
 
         virtual int width()
@@ -313,13 +394,56 @@ class RendererImpl : public Renderer, public WebTech::IBackingStore::IUpdater {
         virtual void release()
         {
 #if ENABLE(GPU_ACCELERATED_SCROLLING)
-            MutexLocker locker(m_mutex);
+            MutexLocker locker(s_mutex);
 #endif
             --m_refCount;
-            if (m_refCount<=0)
+            if (m_refCount<=0) {
+#if ENABLE(GPU_ACCELERATED_SCROLLING)
+                pid_t tid = gettid();
+                EGLContext ctx = eglGetCurrentContext();
+                if ((m_textureName || m_eglImage)
+                    && ((m_tid != 0 && tid != m_tid) || (m_context != 0 && m_context != ctx))) {
+                    // We're not in the UI thread. Add this instance of RendererImpl
+                    // to the delete list so that it can be deleted later on in the UI thread.
+                    BackingStoreBuffer* next = s_deleteList;
+                    s_deleteList = this;
+                    m_next = next;
+                } else {
+                    delete this;
+                    processDeleteList();
+                }
+#else
                 delete this;
+#endif
+            }
         }
 
+#if ENABLE(GPU_ACCELERATED_SCROLLING)
+        //Must be called in UI thread
+        static void processDeleteList()
+        {
+            LOG_RENDER("BackingStoreBuffer::processDeleteList");
+            BackingStoreBuffer* next = s_deleteList;
+            s_deleteList = 0;
+            while(next) {
+                BackingStoreBuffer* buf = next;
+                next = next->m_next;
+                LOG_RENDER("deleting BackingStoreBuffer %p", buf);
+                delete buf;
+            }
+        }
+
+        static int numBuffersInDeleteList()
+        {
+            BackingStoreBuffer* next = s_deleteList;
+            int num = 0;
+            while(next) {
+                ++num;
+                next = next->m_next;
+            }
+            return num;
+        }
+#endif
         const SkBitmap& getBitmap()
         {
             return m_bitmap;
@@ -330,13 +454,25 @@ class RendererImpl : public Renderer, public WebTech::IBackingStore::IUpdater {
             return m_id;
         }
 
-        void lock()
+        void lock(WebTech::IBackingStore::UpdateRegion* lockRect = 0)
         {
 #if ENABLE(GPU_ACCELERATED_SCROLLING)
             if (m_graphicBuffer != 0) {
                 void* buf = NULL;
                 LOG_RENDER("locking GraphicBuffer");
-                m_graphicBuffer->lock(GRALLOC_USAGE_SW_READ_OFTEN | GRALLOC_USAGE_SW_WRITE_OFTEN, (void**)(&buf));
+                status_t stat;
+                if (lockRect) {
+                    android::Rect arect((lockRect->x1 > 0)? lockRect->x1 : 0,
+                        (lockRect->y1 > 0)? lockRect->y1 : 0,
+                        (lockRect->x2 <= m_bitmap.width())? lockRect->x2 : m_bitmap.width(),
+                        (lockRect->y2 <= m_bitmap.height())? lockRect->y2 : m_bitmap.height());
+                    stat = m_graphicBuffer->lock(GRALLOC_USAGE_SW_READ_OFTEN | GRALLOC_USAGE_SW_WRITE_OFTEN, arect, (void**)(&buf));
+                } else
+                    stat = m_graphicBuffer->lock(GRALLOC_USAGE_SW_READ_OFTEN | GRALLOC_USAGE_SW_WRITE_OFTEN, (void**)(&buf));
+                if (stat != NO_ERROR) {
+                    SLOGE("BackingStoreBuffer: GraphicBuffer::lock() failed (error = %d) num buffers remaining: %d, in delete list: %d, num renderers: %d", stat, s_numBuffers, numBuffersInDeleteList(), s_numRenderers);
+                    buf = 0;
+                }
                 m_bitmap.setPixels(buf);
             }
 #endif // GPU_ACCELERATED_SCROLLING
@@ -353,21 +489,32 @@ class RendererImpl : public Renderer, public WebTech::IBackingStore::IUpdater {
         }
 
 #if ENABLE(GPU_ACCELERATED_SCROLLING)
+        //Must be called in UI thread
         GLuint bindTexture()
         {
             LOG_RENDER("bindTexture");
+            {
+                MutexLocker locker(s_mutex);
+                processDeleteList();
+            }
+
+            if (failed())
+                return 0;
+
             if (!m_eglImage && m_graphicBuffer != 0) {
                 EGLDisplay display = eglGetCurrentDisplay();
                 EGLClientBuffer clientBuffer = (EGLClientBuffer)m_graphicBuffer->getNativeBuffer();
                 m_eglImage = eglCreateImageKHR(display, EGL_NO_CONTEXT, EGL_NATIVE_BUFFER_ANDROID,
                     clientBuffer, 0);
                 if (!m_eglImage) {
-                    LOG_RENDER("eglCreateImageKHR failed");
+                    SLOGE("BackingStoreBuffer: eglCreateImageKHR failed.  num buffers remaining: %d, in delete list: %d, num renderers: %d", s_numBuffers, numBuffersInDeleteList(), s_numRenderers);
                 }
                 m_eglDisplay = display;
             }
 
             if (!m_textureName) {
+                m_tid = gettid();
+                m_context = eglGetCurrentContext();
                 glGenTextures(1, &m_textureName);
                 glBindTexture(GL_TEXTURE_2D, m_textureName);checkGlError("glBindTexture");
                 glEGLImageTargetTexture2DOES(GL_TEXTURE_2D, (GLeglImageOES)m_eglImage);checkGlError("glEGLImageTargetTexture2DOES");
@@ -387,46 +534,37 @@ class RendererImpl : public Renderer, public WebTech::IBackingStore::IUpdater {
     private:
         static SkBitmap::Config bppToConfig(int bpp)
         {
-            if (bpp == 16)
+            if (bpp == 2)
                 return SkBitmap::kRGB_565_Config;
             return SkBitmap::kARGB_8888_Config;
         }
 
+#if ENABLE(GPU_ACCELERATED_SCROLLING)
         static int bppToGraphicBufferFormat(int bpp)
         {
-            if (bpp == 16)
+            if (bpp == 2)
                 return HAL_PIXEL_FORMAT_RGB_565;
             return HAL_PIXEL_FORMAT_RGBA_8888;
         }
+#endif
 
         int m_refCount;
         SkBitmap m_bitmap;
         static int s_numBuffers;
         unsigned int m_id;
 #if ENABLE(GPU_ACCELERATED_SCROLLING)
-        WTF::Mutex m_mutex;
+        sp<IGraphicBufferAlloc> m_graphicBufferAlloc;
+        static WTF::Mutex s_mutex;
         sp<GraphicBuffer> m_graphicBuffer;
         EGLImageKHR m_eglImage;
         EGLDisplay m_eglDisplay;
         GLuint m_textureName;
+        EGLContext m_context;
+        pid_t m_tid;
+        BackingStoreBuffer* m_next;
+        static BackingStoreBuffer* s_deleteList;
 #endif // GPU_ACCELERATED_SCROLLING
     };
-
-#if ENABLE(GPU_ACCELERATED_SCROLLING)
-    class GLBackingStoreBufferManager {
-    public:
-        GLBackingStoreBufferManager();
-        ~GLBackingStoreBufferManager();
-        static GLBackingStoreBufferManager* getGLBackingStoreBufferManager();
-        BackingStoreBuffer* getBuffer(int w, int h);
-
-    private:
-        BackingStoreBuffer* m_bufferPortrait;
-        BackingStoreBuffer* m_bufferLandscape;
-        sp<ISurfaceComposer> m_composer;
-        sp<IGraphicBufferAlloc> m_graphicBufferAlloc;
-    };
-#endif // GPU_ACCELERATED_SCROLLING
 
     // ContentData - data that must be guarded in mutex.  New content can be set in a webcore thread (webkit main thread),
     // but used in the UI thread.  Any data that can be changed in the webcore thread is encapsulated in
@@ -576,11 +714,11 @@ class RendererImpl : public Renderer, public WebTech::IBackingStore::IUpdater {
             if (picture)
                 m_incomingPicture = new SkPicture(*picture);
 
-            IntRect largeRect = rect;
+            WebCore::IntRect largeRect = rect;
             largeRect.inflateX(rect.width());
             largeRect.inflateY(rect.height());
 
-            IntRect urect = unionRect(largeRect, m_lastPictureRect);
+            WebCore::IntRect urect = unionRect(largeRect, m_lastPictureRect);
             bool invalidate = false;
             if (!urect.isEmpty()) {
                 ++m_numIncomingPicture;
@@ -635,12 +773,19 @@ public:
         , m_syncObject(EGL_NO_SYNC_KHR)
 #endif
         , m_bufferInUse(0)
+#if ENABLE(GPU_ACCELERATED_SCROLLING)
+        , m_2DRenderer(0)
+        , m_FPSRenderer(0)
+        , m_tid(0)
+        , m_context(0)
+        , m_next(0)
+#endif
+        , m_numTimesScrollChanged(0)
+        , m_numTimesScrollUnchanged(0)
+        , m_interactiveScrolling(false)
+        , m_alphaBlending(false)
     {
         RendererConfig::getConfig()->init();
-        m_doPartialRender = RendererConfig::getConfig()->enablePartialRender;
-#if ENABLE(GPU_ACCELERATED_SCROLLING)
-        m_2DRenderer = m_createRenderer2D();
-#endif // GPU_ACCELERATED_SCROLLING
 
         char libraryName[PROPERTY_VALUE_MAX];
         property_get(WebTech::BackingStoreLibraryNameProperty, libraryName, WebTech::BackingStoreLibraryName);
@@ -665,11 +810,48 @@ public:
             else
                 LOG_RENDER("Loaded acceleration library %s", libraryName);
         }
+
+        if (m_library) {
+            const char* version = m_getBackingStoreVersion();
+            LOG_RENDER("creating WebTech BackingStore - version %s", version);
+            int vlen = strlen(WEBTECH_BACKINGSTORE_VERSION);
+            int cmp = strncmp(version, WEBTECH_BACKINGSTORE_VERSION, vlen);
+            if (cmp)
+                LOG_RENDER("WARNING:  WebTech BackingStore version is wrong. Looking for version %s", WEBTECH_BACKINGSTORE_VERSION);
+
+            m_backingStore = m_createBackingStore(static_cast<WebTech::IBackingStore::IUpdater*>(this));
+            if (m_backingStore) {
+                m_backingStore->setParam(WebTech::IBackingStore::LOG_DEBUG, s_log);
+                m_backingStore->setParam(WebTech::IBackingStore::LOG_PERFORMANCE, s_logPerf);
+                m_backingStore->setParam(WebTech::IBackingStore::ALLOW_SPECULATIVE_UPDATE, (RendererConfig::getConfig()->enableSpeculativeUpdate)? 1 : 0);
+            }
+
+#if ENABLE(GPU_ACCELERATED_SCROLLING)
+            if (!m_2DRenderer)
+                m_2DRenderer = m_createRenderer2D();
+            if (RendererConfig::getConfig()->enableFPSDisplay) {
+                m_FPSRenderer = m_createRenderer2D();
+                m_FPSRenderer->setCacheSize(1000000);
+            }
+            m_tid = gettid();
+#endif // GPU_ACCELERATED_SCROLLING
+        }
+
+        m_enabled = RendererConfig::getConfig()->enableDraw && m_backingStore;
+        m_doPartialRender = RendererConfig::getConfig()->enablePartialRender;
+
+        ++s_numRenderers;
+        LOG_RENDER("created RendererImpl - number of renderers: %d", s_numRenderers);
     }
 
     ~RendererImpl()
     {
 #if ENABLE(GPU_ACCELERATED_SCROLLING)
+        pid_t tid = gettid();
+        EGLContext ctx = eglGetCurrentContext();
+        if ((m_tid != 0 && tid != m_tid) || (m_context != 0 && m_context != ctx)) {
+            SLOGE("~RendererImpl not called in UI thread or context is changed");
+        }
         GLResourceUsers::getGLResourceUsers()->releaseGLResource(this);
 #endif
         if (m_backingStore)
@@ -677,7 +859,7 @@ public:
 #if ENABLE(GPU_ACCELERATED_SCROLLING)
         glBindTexture(GL_TEXTURE_2D, 0);
         if (m_syncObject != EGL_NO_SYNC_KHR)
-            eglDestroySyncKHR(eglGetCurrentDisplay(), m_syncObject);
+            eglDestroySyncKHR(m_syncDisplay, m_syncObject);
 #endif
         if (m_bufferInUse) {
 #if ENABLE(GPU_ACCELERATED_SCROLLING)
@@ -688,30 +870,55 @@ public:
 #if ENABLE(GPU_ACCELERATED_SCROLLING)
         if (m_2DRenderer)
             m_2DRenderer->release();
+        if (m_FPSRenderer)
+            m_FPSRenderer->release();
 #endif
         if (m_library)
             dlclose(m_library);
+
+        --s_numRenderers;
+        LOG_RENDER("~RendererImpl - number of renderers left: %d", s_numRenderers);
     }
 
     virtual void release()
     {
-        delete this;
+#if ENABLE(GPU_ACCELERATED_SCROLLING)
+        pid_t tid = gettid();
+        EGLContext ctx = eglGetCurrentContext();
+        if ((m_tid != 0 && tid != m_tid) || (m_context != 0 && m_context != ctx)) {
+            // We're not in the UI thread. Add this instance of RendererImpl
+            // to the delete list so that it can be deleted later on in the UI thread.
+            RendererImpl* next = s_deleteList;
+            s_deleteList = this; // This instance as the head of the list
+            m_next = next; // point to the previous head.
+        } else
+#endif
+            delete this;
+    }
+
+    virtual void enable(bool e)
+    {
+        if (e)
+            m_enabled = RendererConfig::getConfig()->enableDraw && m_backingStore;
+        else
+            m_enabled = false;
+    }
+
+    virtual bool enabled()
+    {
+        return m_enabled;
     }
 
     // can be called from webcore thread (webkit main thread).
     virtual void setContent(const PictureSet& content, SkRegion* region, bool loading)
     {
         bool invalidate = m_contentData.onNewContent(content, region, &loading);
-        if (!m_doPartialRender && m_backingStore && invalidate)
-            m_backingStore->invalidate();
     }
 
     // can be called from webcore thread (webkit main thread).
     virtual void setContent(const SkPicture* picture, WebCore::IntRect& rect)
     {
         bool invalidate = m_contentData.onNewPicture(picture, rect);
-        if (!m_doPartialRender && m_backingStore && invalidate)
-            m_backingStore->invalidate();
     }
 
     // can be called from webcore thread (webkit main thread).
@@ -756,9 +963,14 @@ public:
     // called in the UI thread.
     virtual bool drawContent(SkCanvas* canvas, SkColor color, bool invertColor, PictureSet& content, bool& splitContent)
     {
-        if (!RendererConfig::getConfig()->enableDraw)
+        if (!m_enabled)
             return false;
         LOG_RENDER("drawContent");
+
+        if (m_request.valid && m_request.useGL) {
+            LOG_RENDER("drawContent called for a GL Renderer.  abort.");
+            return false;
+        }
 
 #ifdef DO_LOG_RENDER
         if (s_log) {
@@ -800,11 +1012,13 @@ public:
 
 #if ENABLE(GPU_ACCELERATED_SCROLLING)
 
-    bool drawContentGL(PictureSet& content, WebCore::IntRect& viewRect, SkRect& contentRect, float scale, SkColor color)
+    bool drawContentGL(PictureSet& content, WebCore::IntRect& viewRect, SkRect& contentRect, float scale, WebCore::Color color)
     {
-        if (!RendererConfig::getConfig()->enableDraw)
+        if (!m_enabled)
             return false;
         LOG_RENDER("drawContentGL");
+
+        processDeleteList();
 
         GLResourceUsers::getGLResourceUsers()->getGLResource(this);
 
@@ -820,25 +1034,70 @@ public:
 
         EGLDisplay display = eglGetCurrentDisplay();
         if (m_syncObject != EGL_NO_SYNC_KHR) {
-            EGLint status = eglClientWaitSyncKHR(display, m_syncObject, 0, 1000000);
+            EGLint status = eglClientWaitSyncKHR(m_syncDisplay, m_syncObject, 0, 1000000);
 
             if (status == EGL_TIMEOUT_EXPIRED_KHR)
                 LOG_RENDER("Sync timeout");
 
-            eglDestroySyncKHR(display, m_syncObject);
+            eglDestroySyncKHR(m_syncDisplay, m_syncObject);
             m_syncObject = EGL_NO_SYNC_KHR;
         }
-        if (m_bufferInUse) {
-            m_bufferInUse->release();
-            m_bufferInUse = 0;
-        }
+
         onDraw(request, 0);
 
         m_syncObject = eglCreateSyncKHR(display, EGL_SYNC_FENCE_KHR, 0);
+        m_syncDisplay = display;
 
         return request.needRedraw;
     }
+
+    virtual void displayFPS(int ix, int iy, int iwidth, int iheight)
+    {
+        if (RendererConfig::getConfig()->enableFPSDisplay && m_FPSRenderer) {
+            m_FPSRenderer->init(ix, iy, iwidth, iheight);
+            char str[4];
+            SkCanvas canvas;
+            SkBitmap    bitmap;
+            int bw = 25;
+            int bh = 25;
+            bitmap.setConfig(SkBitmap::kARGB_8888_Config, bw, bh);
+            bitmap.allocPixels();
+            bitmap.eraseColor(SK_ColorWHITE);
+            canvas.setBitmapDevice(bitmap);
+            SkPaint paint;
+            paint.setAntiAlias(true);
+            paint.setTextSize(SkIntToScalar(15));
+            paint.setColor(SK_ColorBLACK);
+
+            static double gPrevDur = 0;
+            static nsecs_t gNow = 0;
+            nsecs_t t = systemTime();
+            nsecs_t dt = t - gNow;
+            gNow = t;
+            double fdur = dt /1000000000.0;
+            fdur = (gPrevDur + fdur) / 2;
+            gPrevDur = fdur;
+
+            int dur = (int)(10.0 / fdur);
+            str[3] = (char)('0' + dur % 10); dur /= 10;
+            str[2] = (char)('0' + dur % 10); dur /= 10;
+            str[1] = (char)('0' + dur % 10); dur /= 10;
+            str[0] = (char)('0' + dur % 10);
+
+            canvas.drawText(str, 4, SkIntToScalar(1), SkIntToScalar(15), paint);
+            bitmap.lockPixels();
+            void* ptr = bitmap.getPixels();
+            static unsigned int s_key = 0;
+            m_FPSRenderer->drawImage(ptr, bw, bh, 0, s_key, true, 0, 0, bw, bh, 0, 0, bw, bh);
+            bitmap.unlockPixels();
+        }
+    }
 #endif // ENABLE(GPU_ACCELERATED_SCROLLING)
+
+    virtual void setAlphaBlending(bool set)
+    {
+        m_alphaBlending = set;
+    }
 
     ////////////////////////////// IBackingStore::IUpdater methods ///////////////////////
     virtual void inPlaceScroll(WebTech::IBackingStore::IBuffer* buffer, int x, int y, int w, int h, int dx, int dy)
@@ -851,6 +1110,10 @@ public:
             return;
 
         bitmap->lock();
+        if (bitmap->failed()) {
+            LOG_RENDER("inPlaceScroll: buffer not valid");
+            return;
+        }
         int pitch = bitmap->getBitmap().rowBytes();
         int bpp = bitmap->getBitmap().bytesPerPixel();
         int ny = h;
@@ -887,19 +1150,11 @@ public:
         LOG_RENDER("RendererImpl::createBuffer");
         BackingStoreBuffer* buffer;
 
+        buffer = new BackingStoreBuffer(w, h, SkBitmap::ComputeBytesPerPixel(m_request.config)
 #if ENABLE(GPU_ACCELERATED_SCROLLING)
-        GLBackingStoreBufferManager* mgr = GLBackingStoreBufferManager::getGLBackingStoreBufferManager();
-
-        if (mgr) {
-            buffer = mgr->getBuffer(w, h);
-        } else
+            , true
 #endif
-            buffer = new BackingStoreBuffer(w, h, SkBitmap::ComputeBytesPerPixel(m_request.config)
-#if ENABLE(GPU_ACCELERATED_SCROLLING)
-            , 0
-#endif
-            );
-
+        );
 
         if (!buffer || buffer->failed()) {
             SLOGV("failed to allocate buffer for backing store");
@@ -924,7 +1179,17 @@ public:
         BackingStoreBuffer* bitmap = static_cast<BackingStoreBuffer*>(buffer);
         if (!bitmap)
             return;
-        bitmap->lock();
+        WebTech::IBackingStore::UpdateRegion lockRect;
+        lockRect.x1 = bufferX;
+        lockRect.y1 = bufferY;
+        lockRect.x2 = bufferX + region.x2 - region.x1;
+        lockRect.y2 = bufferY + region.y2 - region.y1;
+        bitmap->lock(&lockRect);
+
+        if (bitmap->failed()) {
+            LOG_RENDER("renderToBackingStoreRegion: buffer not valid");
+            return;
+        }
 
         LOG_RENDER("renderToBackingStoreRegion. out(%d, %d), area=(%d, %d) to (%d, %d) size=(%d, %d). scale = %f",
             bufferX, bufferY, region.x1, region.y1, region.x2, region.y2, region.x2 - region.x1, region.y2 - region.y1, scale);
@@ -946,15 +1211,6 @@ public:
         addFlags = 0;
         SkPaintFlagsDrawFilter filterLo(removeFlags, addFlags);
 
-        int sc = canvas->save(SkCanvas::kClip_SaveFlag);
-
-        if (m_contentData.m_content) {
-            clipRect.set(0, 0, m_contentData.m_content->width(), m_contentData.m_content->height());
-            canvas->clipRect(clipRect, SkRegion::kDifference_Op);
-        }
-        canvas->drawColor(m_request.color);
-        canvas->restoreToCount(sc);
-
         if (existingRegion) {
             SkRegion* clip = m_contentData.m_contentInvalidRegion.get();
             SkRegion* transformedClip = transformContentClip(*clip, s, dx, dy);
@@ -970,6 +1226,19 @@ public:
                 }
             }
         }
+
+        int sc = 0;
+        if (!m_alphaBlending) {
+            sc = canvas->save(SkCanvas::kClip_SaveFlag);
+
+            if (m_contentData.m_content) {
+                clipRect.set(0, 0, m_contentData.m_content->width(), m_contentData.m_content->height());
+                canvas->clipRect(clipRect, SkRegion::kDifference_Op);
+            }
+        }
+        canvas->drawColor(m_request.viewColor, SkXfermode::kSrc_Mode);
+        if (!m_alphaBlending)
+            canvas->restoreToCount(sc);
 
         if (m_contentData.m_content) {
             m_contentData.m_content->draw(canvas
@@ -988,6 +1257,23 @@ public:
     }
 
 private:
+
+#if ENABLE(GPU_ACCELERATED_SCROLLING)
+    //Must be called in UI thread
+    static void processDeleteList()
+    {
+        LOG_RENDER("RendererImpl::processDeleteList");
+        RendererImpl* next = s_deleteList;
+        s_deleteList = 0;
+        while(next) {
+            RendererImpl* renderer = next;
+            next = next->m_next;
+            LOG_RENDER("deleting RendererImpl %p", renderer);
+            delete renderer;
+        }
+    }
+#endif
+
     SkRegion* transformContentClip(SkRegion& rgn, float scale, float dx, float dy)
     {
         SkRegion* clip = new SkRegion;
@@ -1013,16 +1299,18 @@ private:
 
         if (RendererConfig::getConfig()->enableZoom && !m_request.useGL && m_request.valid && (request.contentScale != m_request.contentScale) && request.quality == RenderTask::LOW) {
                 LOG_RENDER("Renderer client detected interactive zoom");
+                request.zooming = true;
                 ret = true;
         } else if (m_request.useGL || !RendererConfig::getConfig()->enableZoom) {
             if (request.contentScale != m_lastScale)
                 m_numTimesScaleUnchanged = 0;
-            else if (m_numTimesScaleUnchanged < 5)
+            else if (m_numTimesScaleUnchanged < RendererConfig::getConfig()->interactiveZoomDelayUpdate)
                     ++m_numTimesScaleUnchanged;
 
-            if (m_request.valid && (m_numTimesScaleUnchanged < 3)) {
+            if (m_request.valid && (m_numTimesScaleUnchanged < RendererConfig::getConfig()->interactiveZoomDelayUpdate)) {
                 LOG_RENDER("Renderer client detected interactive zoom");
                 request.needRedraw = true;
+                request.zooming = true;
                 ret = true;
             }
         }
@@ -1030,7 +1318,45 @@ private:
         return ret;
     }
 
-    void generateRequest(SkCanvas* canvas, SkColor color, bool invertColor, RenderTask& task)
+    bool detectInteractiveScroll(RenderTask& request)
+    {
+        if (!m_request.useGL) {
+            //SW relies on low quality mode to indicate interactive zoom/pan.
+            //And there's no mechanism for forcing rerender.  So don't risk
+            //rendering in scroll mode when it's may be the last frame update.
+            request.scrolling = m_interactiveScrolling = (request.quality == RenderTask::LOW);
+            return m_interactiveScrolling;
+        }
+
+        if (!m_interactiveScrolling) {
+            if (request.contentOrigin.fX != m_request.contentOrigin.fX
+                || request.contentOrigin.fY != m_request.contentOrigin.fY)
+                ++m_numTimesScrollChanged;
+            else
+                m_numTimesScrollChanged = 0;
+            if (m_numTimesScrollChanged >= RendererConfig::getConfig()->interactiveScrollStart) {
+                m_interactiveScrolling = true;
+                m_numTimesScrollChanged = RendererConfig::getConfig()->interactiveScrollStart;
+            }
+            m_numTimesScrollUnchanged = 0;
+        } else {
+            if (request.contentOrigin.fX == m_request.contentOrigin.fX
+                && request.contentOrigin.fY == m_request.contentOrigin.fY)
+                ++m_numTimesScrollUnchanged;
+            else
+                m_numTimesScrollUnchanged = 0;
+
+            if (m_numTimesScrollUnchanged >= RendererConfig::getConfig()->interactiveScrollEnd) {
+                m_interactiveScrolling = false;
+                m_numTimesScrollUnchanged = RendererConfig::getConfig()->interactiveScrollEnd;
+            }
+            m_numTimesScrollChanged = 0;
+        }
+        request.scrolling = m_interactiveScrolling;
+        return m_interactiveScrolling;
+    }
+
+    void generateRequest(SkCanvas* canvas, SkColor viewColor, bool invertColor, RenderTask& task)
     {
         const SkRegion& clip = canvas->getTotalClip();
         const SkMatrix & matrix = canvas->getTotalMatrix();
@@ -1060,7 +1386,8 @@ private:
         task.viewportWidth = bitmap.width();
         task.viewportHeight = bitmap.height();
         task.config = bitmap.getConfig();
-        task.color = color;
+        task.viewColor = viewColor;
+        task.pageBackgroundColor = WebCore::Color::white;
         task.invertColor = invertColor;
         task.quality = (filterBitmap)? RenderTask::HIGH : RenderTask::LOW;
         task.valid = true;
@@ -1069,10 +1396,12 @@ private:
         task.useGL = false;
         task.needGLSync = false;
         task.needRedraw = false;
+        task.scrolling = false;
+        task.zooming = false;
     }
 
 #if ENABLE(GPU_ACCELERATED_SCROLLING)
-    void generateRequestGL(WebCore::IntRect& viewRect, SkRect& contentRect, float scale, SkColor color, RenderTask& task)
+    void generateRequestGL(WebCore::IntRect& viewRect, SkRect& contentRect, float scale, WebCore::Color pageBackgroundColor, RenderTask& task)
     {
         EGLDisplay display = eglGetCurrentDisplay();
         EGLSurface surface = eglGetCurrentSurface(EGL_DRAW);
@@ -1092,8 +1421,38 @@ private:
         scaledContentRect.fTop = contentRect.fTop * scale;
         scaledContentRect.fBottom = contentRect.fBottom * scale;
 
-        viewX = viewRect.x();
-        viewY = (viewportHeight - viewRect.y()) - viewRect.height();
+        // viewRect is specified with (0,0) being the lower left corner.  We invert it
+        // so that it's consistent with the other coordinates (with (0,0) being the upper left corner)
+        SkIRect iviewRect;
+        iviewRect.set(viewRect.x(), (viewportHeight - viewRect.bottom()), viewRect.right(), (viewportHeight - viewRect.y()));
+
+
+        // make sure viewRect is within bound of the output surface
+        if (iviewRect.fLeft < 0) {
+            int newWidth = iviewRect.fRight - 0;
+            float ratio = (float)newWidth/iviewRect.width();
+            iviewRect.fLeft = 0;
+            scaledContentRect.fLeft = scaledContentRect.fRight - scaledContentRect.width() * ratio;
+        }
+        if (iviewRect.fRight > viewportWidth) {
+            int newWidth = viewportWidth - iviewRect.fLeft;
+            float ratio = (float)newWidth/iviewRect.width();
+            iviewRect.fRight = viewportWidth;
+            scaledContentRect.fRight = scaledContentRect.fLeft + scaledContentRect.width() * ratio;
+        }
+        if (iviewRect.fTop < 0) {
+            int newHeight = iviewRect.fBottom - 0;
+            float ratio = (float)newHeight/iviewRect.height();
+            iviewRect.fTop = 0;
+            scaledContentRect.fTop = scaledContentRect.fBottom - scaledContentRect.height() * ratio;
+        }
+        if (iviewRect.fBottom > viewportHeight) {
+            int newHeight = viewportHeight - iviewRect.fTop;
+            float ratio = (float)newHeight/iviewRect.height();
+            iviewRect.fBottom = viewportHeight;
+            scaledContentRect.fBottom = scaledContentRect.fTop + scaledContentRect.height() * ratio;
+        }
+
         task.requestArea.x1 = scaledContentRect.fLeft;
         task.requestArea.y1 = scaledContentRect.fTop;
         task.requestArea.x2 = scaledContentRect.fRight;
@@ -1103,12 +1462,13 @@ private:
         if ((task.requestArea.y2 - task.requestArea.y1) > viewportHeight)
             task.requestArea.y2 = task.requestArea.y1 + viewportHeight;
         task.contentScale = scale;
-        task.contentOrigin.fX = scaledContentRect.fLeft - viewX;
-        task.contentOrigin.fY = scaledContentRect.fTop - viewY;
+        task.contentOrigin.fX = scaledContentRect.fLeft - iviewRect.fLeft;
+        task.contentOrigin.fY = scaledContentRect.fTop - iviewRect.fTop;
         task.viewportWidth = viewportWidth;
         task.viewportHeight = viewportHeight;
         task.config = SkBitmap::kARGB_8888_Config;
-        task.color = color;
+        task.viewColor = SK_ColorWHITE;
+        task.pageBackgroundColor = pageBackgroundColor;
         task.invertColor = false;
         task.quality = RenderTask::HIGH;
         task.valid = true;
@@ -1117,6 +1477,8 @@ private:
         task.useGL = true;
         task.needGLSync = false;
         task.needRedraw = false;
+        task.scrolling = false;
+        task.zooming = false;
     }
 #endif // ENABLE(GPU_ACCELERATED_SCROLLING)
 
@@ -1134,10 +1496,10 @@ private:
             if (m_backingStore)
                 m_backingStore->invalidate();
         }
+        detectInteractiveScroll(request);
 
         bool result = false;
-        if (!m_doPartialRender || request.quality == RenderTask::HIGH)
-            handleNewContent(request);
+        handleNewContent(request);
 
         if (shouldUpdate) {
             bool changingBuffer = m_request.valid && (request.config != m_request.config
@@ -1154,12 +1516,16 @@ private:
             finish();
 
         double endTime =  WTF::currentTimeMS();
-        double elapsedTime = endTime-startTime;
-        LOG_PERF("drawContent %s %s %s took %f msec.",
+        double elapsedTime = endTime - startTime;
+        double frameElapsedTime = startTime - m_lastFrameTime;
+        LOG_PERF("drawContent (%d, %d) %s %s %s took %f msec. %f since last frame.",
+            request.contentOrigin.fX, request.contentOrigin.fY,
             (request.newContent)? "(with new content)" : "",
             (m_loading)? "(loading)" : "",
             (drawn)? "" : "aborted and",
-            elapsedTime);
+            elapsedTime,
+            frameElapsedTime);
+        m_lastFrameTime = startTime;
 
         return drawn;
     }
@@ -1168,13 +1534,17 @@ private:
     {
         task.newContent = false;
         if (m_contentData.numContentChanged() > 0 || m_contentData.numPictureChanged() > 0) {
+            if (task.scrolling) {
+                task.needRedraw = true;
+                return;
+            }
             task.newContent = (m_contentData.numContentChanged() + m_contentData.numPictureChanged());
             if (m_backingStore)
                 m_backingStore->finish();
             if (task.useGL)
                 task.needGLSync = true;
             m_contentData.changeToNewContent();
-            if (m_contentData.m_invalidateAll && !m_doPartialRender) {
+            if (m_contentData.m_invalidateAll) {
                 if (m_backingStore)
                     m_backingStore->invalidate();
                 m_contentData.m_invalidateAll = false;
@@ -1186,25 +1556,6 @@ private:
     {
         bool result = false;
 
-        if (!m_library)
-            return false;
-
-        if (!m_backingStore) {
-            const char* version = m_getBackingStoreVersion();
-            LOG_RENDER("creating WebTech BackingStore - version %s", version);
-            int vlen = strlen(WEBTECH_BACKINGSTORE_VERSION);
-            int cmp = strncmp(version, WEBTECH_BACKINGSTORE_VERSION, vlen);
-            if (cmp)
-                LOG_RENDER("WARNING:  WebTech BackingStore version is wrong. Looking for version %s", WEBTECH_BACKINGSTORE_VERSION);
-
-            m_backingStore = m_createBackingStore(static_cast<WebTech::IBackingStore::IUpdater*>(this));
-            if (m_backingStore) {
-                m_backingStore->setParam(WebTech::IBackingStore::LOG_DEBUG, s_log);
-                m_backingStore->setParam(WebTech::IBackingStore::LOG_PERFORMANCE, s_logPerf);
-                m_backingStore->setParam(WebTech::IBackingStore::ALLOW_SPECULATIVE_UPDATE, (RendererConfig::getConfig()->enableSpeculativeUpdate)? 1 : 0);
-            }
-        }
-
         if (!m_backingStore)
             return false;
 
@@ -1215,8 +1566,8 @@ private:
         }
 
         m_backingStore->setParam(WebTech::IBackingStore::ALLOW_INPLACE_SCROLL, request.useGL? 0 : 1);
-        m_backingStore->setParam(WebTech::IBackingStore::ALLOW_PARTIAL_RENDER, m_doPartialRender? 1 : 0);
-        m_backingStore->setParam(WebTech::IBackingStore::QUALITY, request.quality == RenderTask::HIGH? 1 : 0);
+        m_backingStore->setParam(WebTech::IBackingStore::ALLOW_PARTIAL_RENDER, (m_doPartialRender && (request.zooming || request.scrolling))? 1 : 0);
+        m_backingStore->setParam(WebTech::IBackingStore::QUALITY, request.scrolling? 0 : (request.quality == RenderTask::HIGH? 1 : 0));
         m_backingStore->setParam(WebTech::IBackingStore::ALLOW_ABORT, request.canAbort? 1 : 0);
         m_backingStore->setParam(WebTech::IBackingStore::ALLOW_DELAYED_CLEANUP, request.useGL? 0 : 1);
 
@@ -1295,7 +1646,7 @@ private:
         bitmap.setPixels(static_cast<void*>(pixels));
 
         // do memcpy instead of using SkCanvas to draw if possible
-        if (noClipping && scale == 1.0f && outConfig == inConfig) {
+        if (!m_alphaBlending && noClipping && scale == 1.0f && outConfig == inConfig) {
             if (!i.fX && !o.fX && width == outWidth && height == outHeight && outPitch == inPitch) {
                     char* optr = static_cast<char*>(outPixels);
                     optr = optr + o.fY*outPitch;
@@ -1352,6 +1703,11 @@ private:
             m_bufferInUse = bufferImpl;
         }
 
+        if (!texture)
+            return;
+
+        m_context = eglGetCurrentContext();
+
         m_2DRenderer->init(0, 0, request.viewportWidth, request.viewportHeight);
 
         LOG_RENDER("    draw bitmap (size= %d x %d) input area (%d, %d) - (%d, %d) to output area (%d, %d) - (%d, %d)",
@@ -1363,7 +1719,7 @@ private:
             bufferImpl->getBitmap().width(), bufferImpl->getBitmap().height(),
             i.fX, i.fY, i.fX + width, i.fY + height,
             (int)(o.fX * scale), (int)(o.fY * scale), (int)((o.fX + width) * scale), (int)((o.fY + height) * scale),
-            (scale != 1.0f), false);
+            (scale != 1.0f), m_alphaBlending);
     }
 #endif // ENABLE(GPU_ACCELERATED_SCROLLING)
 
@@ -1408,9 +1764,19 @@ private:
 
         request.needRedraw |= (availability != WebTech::IBackingStore::FULLY_AVAILABLE);
 
-        LOG_RENDER("drawing viewport area (%d, %d) to (%d, %d).  All valid in backing store: %d",
+        int requestSize = (areaToDraw.x2 - areaToDraw.x1) * (areaToDraw.y2 - areaToDraw.y1);
+        int availSize = (areaAvailable.x2 - areaAvailable.x1) * (areaAvailable.y2 - areaAvailable.y1);
+        float ratio = 0.0f;
+        if (requestSize != 0)
+            ratio = (float)availSize / (float)requestSize;
+        LOG_RENDER("drawing viewport area (%d, %d) to (%d, %d).  avail (%d, %d) to (%d, %d). ratio = %f. All valid in backing store: %d",
             areaToDraw.x1, areaToDraw.y1, areaToDraw.x2, areaToDraw.y2,
+            areaAvailable.x1, areaAvailable.y1, areaAvailable.x2, areaAvailable.y2,
+            ratio,
             (allDrawn)?1:0);
+        if (request.canAbort && ratio < 0.2)
+            allDrawn = false;
+
         if (!allDrawn && request.canAbort)
             return false;
 
@@ -1475,9 +1841,9 @@ private:
     void drawResultGL(RenderTask& request, WebTech::IBackingStore::UpdateRegion& areaAvailable, float deltaScale, SkIPoint& contentOrigin, bool clear, bool& ret)
     {
         if (clear) {
-            glClearColor((float)SkColorGetR(request.color) / 255.0,
-                (float)SkColorGetG(request.color) / 255.0,
-                (float)SkColorGetB(request.color) / 255.0, 1);
+            glClearColor((float)request.pageBackgroundColor.red() / 255.0,
+                (float)request.pageBackgroundColor.green() / 255.0,
+                (float)request.pageBackgroundColor.blue() / 255.0, 1);
             glClear(GL_COLOR_BUFFER_BIT);
         }
         WebTech::IBackingStore::IDrawRegionIterator* iter = m_backingStore->beginDrawRegion(areaAvailable, contentOrigin.fX, contentOrigin.fY);
@@ -1507,8 +1873,12 @@ private:
         return 0;
     }
 
+public:
+    static int s_numRenderers;
+
 private:
     WebTech::IBackingStore* m_backingStore;
+    bool m_enabled;
     ContentData m_contentData;
     RenderTask m_request;
     float m_lastScale;
@@ -1516,8 +1886,8 @@ private:
     bool m_loading;
     bool m_doPartialRender;
 #if ENABLE(GPU_ACCELERATED_SCROLLING)
-    WebTech::IRenderer2D* m_2DRenderer;
     EGLSyncKHR m_syncObject;
+    EGLDisplay m_syncDisplay;
 #endif // GPU_ACCELERATED_SCROLLING
     BackingStoreBuffer* m_bufferInUse;
     void* m_library;
@@ -1525,7 +1895,18 @@ private:
     WebTech::GetBackingStoreVersion_t m_getBackingStoreVersion;
 #if ENABLE(GPU_ACCELERATED_SCROLLING)
     WebTech::CreateRenderer2D_t m_createRenderer2D;
+    WebTech::IRenderer2D* m_2DRenderer;
+    WebTech::IRenderer2D* m_FPSRenderer;
+    pid_t m_tid;
+    EGLContext m_context;
+    RendererImpl* m_next;
+    static RendererImpl* s_deleteList;
 #endif
+    double m_lastFrameTime;
+    int m_numTimesScrollChanged;
+    int m_numTimesScrollUnchanged;
+    bool m_interactiveScrolling;
+    bool m_alphaBlending;
 };
 
 RendererImpl::RendererConfig* RendererImpl::RendererConfig::getConfig()
@@ -1605,73 +1986,15 @@ void RendererImpl::GLResourceUsers::releaseGLResource(RendererImpl* renderer)
     }
 }
 
-////////////////////////// GLBackingStoreBufferManager implementation///////////////////
-
-RendererImpl::GLBackingStoreBufferManager::GLBackingStoreBufferManager()
-    : m_bufferPortrait(0)
-    , m_bufferLandscape(0)
-{
-    m_composer = (ComposerService::getComposerService());
-    if (m_composer == 0)
-        LOG_RENDER("cannot create composer");
-    m_graphicBufferAlloc = m_composer->createGraphicBufferAlloc();
-    if (m_graphicBufferAlloc == 0)
-        LOG_RENDER("cannot create GraphicBufferAlloc");
-}
-
-RendererImpl::GLBackingStoreBufferManager::~GLBackingStoreBufferManager()
-{
-
-}
-
-RendererImpl::GLBackingStoreBufferManager* RendererImpl::GLBackingStoreBufferManager::getGLBackingStoreBufferManager()
-{
-static RendererImpl::GLBackingStoreBufferManager s_GLBackingStoreBufferManager;
-    return &s_GLBackingStoreBufferManager;
-}
-
-RendererImpl::BackingStoreBuffer* RendererImpl::GLBackingStoreBufferManager::getBuffer(int w, int h)
-{
-    GLBackingStoreBufferManager* mgr = GLBackingStoreBufferManager::getGLBackingStoreBufferManager();
-    RendererImpl::BackingStoreBuffer* buffer;
-    if (m_graphicBufferAlloc.get()) {
-        if (w > h) {
-            if (m_bufferPortrait) {
-                if (m_bufferPortrait->width() != w || m_bufferPortrait->height() != h) {
-                    m_bufferPortrait->release();
-                    m_bufferPortrait = 0;
-                }
-            }
-            if (!m_bufferPortrait) {
-                LOG_RENDER("createBuffer: creating portrait buffer");
-                m_bufferPortrait = new RendererImpl::BackingStoreBuffer(w, h, SkBitmap::ComputeBytesPerPixel(SkBitmap::kARGB_8888_Config), m_graphicBufferAlloc.get());
-            }
-            m_bufferPortrait->addRef();
-            buffer = m_bufferPortrait;
-        } else {
-            if (m_bufferLandscape) {
-                if (m_bufferLandscape->width() != w || m_bufferLandscape->height() != h) {
-                    m_bufferLandscape->release();
-                    m_bufferLandscape = 0;
-                }
-            }
-            if (!m_bufferLandscape) {
-                LOG_RENDER("createBuffer: creating landscape buffer");
-                m_bufferLandscape = new RendererImpl::BackingStoreBuffer(w, h, SkBitmap::ComputeBytesPerPixel(SkBitmap::kARGB_8888_Config), m_graphicBufferAlloc.get());
-            }
-            m_bufferLandscape->addRef();
-            buffer = m_bufferLandscape;
-        }
-
-        return buffer;
-    }
-
-    return 0;
-}
-
 #endif // ENABLE(GPU_ACCELERATED_SCROLLING)
 
 int RendererImpl::BackingStoreBuffer::s_numBuffers = 0;
+int RendererImpl::s_numRenderers = 0;
+#if ENABLE(GPU_ACCELERATED_SCROLLING)
+WTF::Mutex RendererImpl::BackingStoreBuffer::s_mutex;
+RendererImpl::BackingStoreBuffer* RendererImpl::BackingStoreBuffer::s_deleteList = 0;
+RendererImpl* RendererImpl::s_deleteList = 0;
+#endif // ENABLE(GPU_ACCELERATED_SCROLLING)
 
 } // namespace RendererImplNamespace
 
