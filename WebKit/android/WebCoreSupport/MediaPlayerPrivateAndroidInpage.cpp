@@ -221,7 +221,8 @@ void MediaPlayerPrivateAndroidInpage::play()
             static_cast<HTMLVideoElement*>(m_player->mediaPlayerClient())->updatePosterImage();
         }
 
-        registerHeap();
+        if (!m_frameHeap.get())
+            registerHeap();
 
         // For video we need to update at 30 FPS.
         m_timer.augmentRepeatInterval(VideoTimerFrequency - TimerFrequency);
@@ -496,7 +497,18 @@ void MediaPlayerPrivateAndroidInpage::onMediaBufferingUpdate(MessagePacket* mess
 void MediaPlayerPrivateAndroidInpage::onMediaSeekComplete(MessagePacket* messagePtr)
 {
     LOG_INPAGE("MEDIA_SEEK_COMPLETE(%i, %i)", messagePtr->ext1(), messagePtr->ext2());
-    m_seeking = false;
+
+    // Check m_seeking because there could be more than one MEDIA_SEEK_COMPLETE notification
+    if (m_seeking) {
+        // Flush frame queue
+        while (!m_frameQueue.isEmpty()) {
+            int frame = m_frameQueue.first();
+            m_frameQueue.removeFirst();
+            LOG_INPAGE("returning frame without painting");
+            sendFrameToMediaPlayer(frame);
+        }
+        m_seeking = false;
+    }
     m_player->timeChanged();
 
     // TODO If we are paused, the Android MediaPlayer doesn't update the
@@ -576,8 +588,10 @@ void MediaPlayerPrivateAndroidInpage::onMediaBufferReady(MessagePacket* messageP
 
     // second parameter indicates if buffer contains frame to be displayed or
     // not, if not buffer is put on reallocation queue
-    if (!messagePtr->ext2())
+    if (!messagePtr->ext2()) {
         m_reallocQueue.append(messagePtr->ext1());
+        return;
+    }
 
     if (m_mp->isPlaying()) {
         while (!m_frameQueue.isEmpty()) {
