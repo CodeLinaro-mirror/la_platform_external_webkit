@@ -128,6 +128,7 @@ protected:
 #endif
     bool m_isDNSPrefetch;
     bool m_createdByParser;
+    bool m_isInShadowTree;
 };
 
 } //namespace

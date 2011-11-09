@@ -1,3 +1,201 @@
+2011-02-18  Antti Koivisto  <antti@apple.com>
+
+        Reviewed by Maciej Stachowiak.
+
+        https://bugs.webkit.org/show_bug.cgi?id=54728
+        checkSelector*Value functions used in fastCheckSelector fail to inline
+
+        Wrap the functions used as template arguments to classes.
+
+        * css/CSSStyleSelector.cpp:
+        (WebCore::fastCheckSingleSelector):
+        (WebCore::ClassCheck::checkValue):
+        (WebCore::IdCheck::checkValue):
+        (WebCore::TagCheck::checkValue):
+        (WebCore::CSSStyleSelector::SelectorChecker::fastCheckSelector):
+
+2011-02-15  Antti Koivisto  <antti@apple.com>
+
+        Reviewed by Darin Adler.
+
+        Enable fast path selector checking for child and subselector combinators
+        https://bugs.webkit.org/show_bug.cgi?id=54360
+
+        * css/CSSStyleSelector.cpp:
+        (WebCore::isFastCheckableSelector):
+        (WebCore::fastCheckSingleSelector):
+        (WebCore::checkClassValue):
+        (WebCore::checkIdValue):
+        (WebCore::checkTagValue):
+        (WebCore::CSSStyleSelector::SelectorChecker::fastCheckSelector):
+
+2011-02-13  Antti Koivisto  <antti@apple.com>
+
+        Reviewed by Dan Bernstein.
+
+        https://bugs.webkit.org/show_bug.cgi?id=54376
+        Make sorting of matched rules faster
+
+        - use std::sort
+        - cache specificity, it is slow to compute
+        - inline compare function
+
+        * css/CSSStyleSelector.cpp:
+        (WebCore::RuleData::specificity):
+        (WebCore::CSSStyleSelector::matchRules):
+        (WebCore::compareRules):
+        (WebCore::CSSStyleSelector::sortMatchedRules):
+        (WebCore::RuleData::RuleData):
+        (WebCore::CSSStyleSelector::matchPageRules):
+        * css/CSSStyleSelector.h:
+
+2011-02-10  Antti Koivisto  <antti@apple.com>
+
+        Reviewed by Dave Hyatt.
+
+        Enable ancestor identifier filtering for tree building
+        https://bugs.webkit.org/show_bug.cgi?id=54241
+
+        Call CSSStyleSelector::push/popParent() during tree building too, fix up the parent
+        element stack as needed.
+
+        This roughly halves the remaining time in style matching over a typical page load.
+
+        * css/CSSStyleSelector.cpp:
+        (WebCore::CSSStyleSelector::pushParentStackFrame):
+        (WebCore::CSSStyleSelector::popParentStackFrame):
+        (WebCore::CSSStyleSelector::pushParent):
+        (WebCore::CSSStyleSelector::popParent):
+        * css/CSSStyleSelector.h:
+        (WebCore::CSSStyleSelector::ParentStackFrame::ParentStackFrame):
+        * dom/Document.h:
+        (WebCore::Document::styleSelectorIfExists):
+        * dom/Element.cpp:
+        (WebCore::Element::beginParsingChildren):
+        (WebCore::Element::finishParsingChildren):
+        * dom/Element.h:
+
+2011-02-09  Antti Koivisto  <antti@apple.com>
+
+        Reviewed by Darin Adler.
+
+        https://bugs.webkit.org/show_bug.cgi?id=54103
+        Implement fast path for matching simple selectors
+
+        Implement a fast path for single and descendant selectors consisting
+        of id, class and tag selectors only.
+
+        Selectors like this are marked on style selector initialization. When
+        encountered during style matching they are resolved using a fast path.
+
+        Since selectors like this are very common this speeds up style matching
+        quite a bit (up to 50% on some sites according to Shark).
+
+        * css/CSSStyleSelector.cpp:
+        (WebCore::RuleData::hasFastCheckableSelector):
+        (WebCore::RuleData::hasMultipartSelector):
+        (WebCore::RuleData::hasTopSelectorMatchingHTMLBasedOnRuleHash):
+        (WebCore::CSSStyleSelector::matchRulesForList):
+        (WebCore::CSSStyleSelector::checkSelector):
+        (WebCore::selectorTagMatches):
+        (WebCore::isFastCheckableSelector):
+        (WebCore::CSSStyleSelector::SelectorChecker::fastCheckSelector):
+        (WebCore::CSSStyleSelector::SelectorChecker::checkOneSelector):
+        (WebCore::isSelectorMatchingHTMLBasedOnRuleHash):
+        (WebCore::RuleData::RuleData):
+        * css/CSSStyleSelector.h:
+
+2011-02-08  Antti Koivisto  <antti@apple.com>
+
+        Reviewed by Cameron Zwarich.
+
+        Skip over sibling selectors when collecting descendant selector hashes
+        https://bugs.webkit.org/show_bug.cgi?id=53987
+
+        Skip instead of bailing out. This will allow optimizing some sibling selector cases.
+
+        * css/CSSStyleSelector.cpp:
+        (WebCore::RuleData::RuleData):
+        (WebCore::RuleData::collectIdentifierHashes):
+        (WebCore::RuleData::collectDescendantSelectorIdentifierHashes):
+        * css/CSSStyleSelector.h:
+
+2011-02-07  Antti Koivisto  <antti@apple.com>
+
+        Reviewed by Andreas Kling.
+
+        REGRESSION(r77740): CSSStyleSelector accessing deleted memory for svg/dom/use-transform.svg
+        https://bugs.webkit.org/show_bug.cgi?id=53900
+
+        Ignore link elements in shadow trees.
+
+        * dom/Element.cpp:
+        (WebCore::StyleSelectorParentPusher::StyleSelectorParentPusher):
+        (WebCore::StyleSelectorParentPusher::~StyleSelectorParentPusher):
+
+            Some asserts to catch cases like this.
+
+        (WebCore::Element::attach):
+        (WebCore::Element::recalcStyle):
+        * html/HTMLLinkElement.cpp:
+        (WebCore::HTMLLinkElement::HTMLLinkElement):
+        (WebCore::HTMLLinkElement::process):
+        (WebCore::HTMLLinkElement::insertedIntoDocument):
+        (WebCore::HTMLLinkElement::removedFromDocument):
+        * html/HTMLLinkElement.h:
+
+2011-02-06  Antti Koivisto  <antti@apple.com>
+
+        Reviewed by Maciej Stachowiak.
+
+        Use bloom filter for descendant selector filtering
+        https://bugs.webkit.org/show_bug.cgi?id=53880
+
+        Bloom filter is faster than a hash set in this kind of use.
+
+        Shark thinks this speeds up style matching by ~30% on sites
+        with lots of descendant selectors.
+
+        * ForwardingHeaders/wtf/BloomFilter.h: Added.
+        * css/CSSStyleSelector.cpp:
+        (WebCore::collectElementIdentifierHashes):
+        (WebCore::CSSStyleSelector::pushParent):
+        (WebCore::CSSStyleSelector::popParent):
+        (WebCore::CSSStyleSelector::fastRejectSelector):
+        (WebCore::RuleData::collectDescendantSelectorIdentifierHashes):
+        * css/CSSStyleSelector.h:
+
+2011-02-05  Antti Koivisto  <antti@apple.com>
+
+        Reviewed by Dave Hyatt.
+
+        Optimize matching of descendant selectors
+        https://bugs.webkit.org/show_bug.cgi?id=49876
+        <rdar://problem/8772822>
+
+        During style recalculation, maintain a filter of tags, ids and classes seen in ancestor elements.
+        Use the filter to quickly reject descendant and child selectors when doing style matching.
+
+        This speeds up style recalculations 3-6x on many major web sites.
+
+        * css/CSSStyleSelector.cpp:
+        (WebCore::RuleData::RuleData):
+        (WebCore::RuleData::descendantSelectorIdentifierHashes):
+        (WebCore::collectElementIdentifiers):
+        (WebCore::CSSStyleSelector::pushParent):
+        (WebCore::CSSStyleSelector::popParent):
+        (WebCore::CSSStyleSelector::fastRejectSelector):
+        (WebCore::CSSStyleSelector::matchRulesForList):
+        (WebCore::RuleData::collectDescendantSelectorIdentifierHashes):
+        * css/CSSStyleSelector.h:
+        (WebCore::CSSStyleSelector::ParentStackFrame::ParentStackFrame):
+        * dom/Element.cpp:
+        (WebCore::StyleSelectorParentPusher::StyleSelectorParentPusher):
+        (WebCore::StyleSelectorParentPusher::push):
+        (WebCore::StyleSelectorParentPusher::~StyleSelectorParentPusher):
+        (WebCore::Element::attach):
+        (WebCore::Element::recalcStyle):
+
 2010-02-24  Nicholas Young  <nicholas.young@nokia.com>
 
         Reviewed by Eric Carlson.

@@ -1,6 +1,6 @@
 /*
  * Copyright (C) 1999 Lars Knoll (knoll@kde.org)
- * Copyright (C) 2003, 2004, 2005, 2006, 2007, 2008 Apple Inc. All rights reserved.
+ * Copyright (C) 2003, 2004, 2005, 2006, 2007, 2008, 2009, 2010, 2011 Apple Inc. All rights reserved.
  *
  * This library is free software; you can redistribute it and/or
  * modify it under the terms of the GNU Library General Public
@@ -27,6 +27,7 @@
 #include "MediaQueryExp.h"
 #include "RenderStyle.h"
 #include "StringHash.h"
+#include "BloomFilter.h"
 #include <wtf/HashMap.h>
 #include <wtf/HashSet.h>
 #include <wtf/RefPtr.h>
@@ -85,6 +86,10 @@ public:
                          bool strictParsing, bool matchAuthorAndUserStyles);
         ~CSSStyleSelector();
 
+        // Using these during tree walk will allow style selector to optimize child and descendant selector lookups.
+        void pushParent(Element* parent);
+        void popParent(Element* parent);
+
         void initElementAndPseudoState(Element*);
         void initForStyleResolve(Element*, RenderStyle* parentStyle = 0, PseudoId = NOPSEUDO);
         PassRefPtr<RenderStyle> styleForElement(Element*, RenderStyle* parentStyle = 0, bool allowSharing = true, bool resolveForRootDefault = false);
@@ -104,6 +109,9 @@ public:
         RenderStyle* locateSharedStyle();
         Node* locateCousinList(Element* parent, unsigned& visitedNodes);
         bool canShareStyleWithElement(Node*);
+
+        void pushParentStackFrame(Element* parent);
+        void popParentStackFrame();
 
         RenderStyle* style() const { return m_style.get(); }
 
@@ -140,9 +148,6 @@ public:
  
         CSSFontSelector* fontSelector() { return m_fontSelector.get(); }
 
-        // Checks if a compound selector (which can consist of multiple simple selectors) matches the current element.
-        bool checkSelector(CSSSelector*);
-
         void addViewportDependentMediaQueryResult(const MediaQueryExp*, bool result);
 
         bool affectedByViewportChange() const;
@@ -173,12 +178,27 @@ public:
 
         void matchRules(CSSRuleSet*, int& firstRuleIndex, int& lastRuleIndex);
         void matchRulesForList(CSSRuleDataList*, int& firstRuleIndex, int& lastRuleIndex);
-        void sortMatchedRules(unsigned start, unsigned end);
+        bool fastRejectSelector(const CSSRuleData*) const;
+        void sortMatchedRules();
+
+        bool checkSelector(CSSRuleData*);
 
         void applyDeclarations(bool firstPass, bool important, int startIndex, int endIndex);
         
         CSSRuleSet* m_authorStyle;
         CSSRuleSet* m_userStyle;
+
+        struct ParentStackFrame {
+            ParentStackFrame() {}
+            ParentStackFrame(Element* element) : element(element) {}
+            Element* element;
+            Vector<unsigned, 4> identifierHashes;
+        };
+        Vector<ParentStackFrame> m_parentStack;
+
+        // With 100 unique strings in the filter, 2^12 slot table has false positive rate of ~0.2%.
+        static const unsigned bloomFilterKeyBits = 12;
+        OwnPtr<BloomFilter<bloomFilterKeyBits> > m_ancestorIdentifierFilter;
 
         bool m_hasUAAppearance;
         BorderData m_borderData;
@@ -200,6 +220,7 @@ public:
             bool checkOneSelector(CSSSelector*, Element*, HashSet<AtomicStringImpl*>* selectorAttrs, PseudoId& dynamicPseudo, bool isAncestor, bool isSubSelector, RenderStyle*, RenderStyle* elementParentStyle) const;
             PseudoState checkPseudoState(Element*, bool checkVisited = true) const;
             bool checkScrollbarPseudoClass(CSSSelector*, PseudoId& dynamicPseudo) const;
+            static bool fastCheckSelector(const CSSSelector*, const Element*);
 
             void allVisitedStateChanged();
             void visitedStateChanged(LinkHash visitedHash);
@@ -288,64 +309,6 @@ public:
         HashMap<CSSMutableStyleDeclaration*, RefPtr<CSSMutableStyleDeclaration> > m_resolvedVariablesDeclarations;
     };
 
-    class CSSRuleData : public Noncopyable {
-    public:
-        CSSRuleData(unsigned pos, CSSStyleRule* r, CSSSelector* sel, CSSRuleData* prev = 0)
-            : m_position(pos)
-            , m_rule(r)
-            , m_selector(sel)
-            , m_next(0)
-        {
-            if (prev)
-                prev->m_next = this;
-        }
-
-        ~CSSRuleData() 
-        { 
-        }
-
-        unsigned position() { return m_position; }
-        CSSStyleRule* rule() { return m_rule; }
-        CSSSelector* selector() { return m_selector; }
-        CSSRuleData* next() { return m_next; }
-
-    private:
-        unsigned m_position;
-        CSSStyleRule* m_rule;
-        CSSSelector* m_selector;
-        CSSRuleData* m_next;
-    };
-
-    class CSSRuleDataList : public Noncopyable {
-    public:
-        CSSRuleDataList(unsigned pos, CSSStyleRule* rule, CSSSelector* sel)
-            : m_first(new CSSRuleData(pos, rule, sel))
-            , m_last(m_first)
-        {
-        }
-
-        ~CSSRuleDataList() 
-        { 
-            CSSRuleData* ptr;
-            CSSRuleData* next;
-            ptr = m_first;
-            while (ptr) {
-                next = ptr->next();
-                delete ptr;
-                ptr = next;
-            }
-        }
-
-        CSSRuleData* first() { return m_first; }
-        CSSRuleData* last() { return m_last; }
-
-        void append(unsigned pos, CSSStyleRule* rule, CSSSelector* sel) { m_last = new CSSRuleData(pos, rule, sel, m_last); }
-
-    private:
-        CSSRuleData* m_first;
-        CSSRuleData* m_last;
-    };
-    
 } // namespace WebCore
 
 #endif // CSSStyleSelector_h

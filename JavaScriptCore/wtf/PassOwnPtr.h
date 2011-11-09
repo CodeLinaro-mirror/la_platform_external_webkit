@@ -35,6 +35,8 @@ namespace WTF {
     // Unlike most of our smart pointers, PassOwnPtr can take either the pointer type or the pointed-to type.
 
     template <typename T> class OwnPtr;
+    template<typename T> class PassOwnPtr;
+    template <typename T> class OwnPtr;
 
     template <typename T> class PassOwnPtr {
     public:
@@ -68,6 +70,7 @@ namespace WTF {
         PassOwnPtr& operator=(T*);
         PassOwnPtr& operator=(const PassOwnPtr<T>&);
         template <typename U> PassOwnPtr& operator=(const PassOwnPtr<U>&);
+        template<typename U> friend PassOwnPtr<U> adoptPtr(U*);
 
     private:
         mutable PtrType m_ptr;
@@ -132,7 +135,12 @@ namespace WTF {
     {
         return a.get() != b.get(); 
     }
-    
+
+    template<typename T> inline PassOwnPtr<T> adoptPtr(T* ptr)
+    {
+        return PassOwnPtr<T>(ptr);
+    }
+
     template <typename T, typename U> inline bool operator!=(const PassOwnPtr<T>& a, const OwnPtr<U>& b) 
     {
         return a.get() != b.get(); 
@@ -171,6 +179,7 @@ namespace WTF {
 } // namespace WTF
 
 using WTF::PassOwnPtr;
+using WTF::adoptPtr;
 using WTF::const_pointer_cast;
 using WTF::static_pointer_cast;
 

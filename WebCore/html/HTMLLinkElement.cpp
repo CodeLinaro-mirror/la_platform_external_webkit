@@ -61,6 +61,7 @@ HTMLLinkElement::HTMLLinkElement(const QualifiedName& qName, Document *doc, bool
 #endif
     , m_isDNSPrefetch(false)
     , m_createdByParser(createdByParser)
+    , m_isInShadowTree(false)
 {
     ASSERT(hasTagName(linkTag));
 }
@@ -195,7 +196,7 @@ void HTMLLinkElement::tokenizeRelAttribute(const AtomicString& rel, bool& styleS
 
 void HTMLLinkElement::process()
 {
-    if (!inDocument())
+    if (!inDocument() || m_isInShadowTree)
         return;
 
     String type = m_type.lower();
@@ -264,6 +265,11 @@ void HTMLLinkElement::process()
 void HTMLLinkElement::insertedIntoDocument()
 {
     HTMLElement::insertedIntoDocument();
+
+    m_isInShadowTree = isInShadowTree();
+    if (m_isInShadowTree)
+        return;
+
     document()->addStyleSheetCandidateNode(this, m_createdByParser);
     process();
 }
@@ -272,6 +278,10 @@ void HTMLLinkElement::removedFromDocument()
 {
     HTMLElement::removedFromDocument();
 
+    if (m_isInShadowTree) {
+        ASSERT(!m_sheet);
+        return;
+    }
     document()->removeStyleSheetCandidateNode(this);
 
     // FIXME: It's terrible to do a synchronous update of the style selector just because a <style> or <link> element got removed.

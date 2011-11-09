@@ -61,6 +61,33 @@ namespace WebCore {
 using namespace HTMLNames;
 using namespace XMLNames;
     
+class StyleSelectorParentPusher {
+public:
+    StyleSelectorParentPusher(Element* parent)
+        : m_parent(parent)
+        , m_pushedStyleSelector(0)
+    {
+    }
+    void push()
+    {
+        if (m_pushedStyleSelector)
+            return;
+        m_pushedStyleSelector = m_parent->document()->styleSelector();
+        m_pushedStyleSelector->pushParent(m_parent);
+    }
+    ~StyleSelectorParentPusher()
+    {
+        if (!m_pushedStyleSelector)
+            return;
+        ASSERT(m_pushedStyleSelector == m_parent->document()->styleSelector());
+        m_pushedStyleSelector->popParent(m_parent);
+    }
+
+private:
+    Element* m_parent;
+    CSSStyleSelector* m_pushedStyleSelector;
+};
+
 Element::Element(const QualifiedName& tagName, Document* document, ConstructionType type)
     : ContainerNode(document, type)
     , m_tagName(tagName)
@@ -786,6 +813,10 @@ void Element::attach()
     RenderWidget::suspendWidgetHierarchyUpdates();
 
     createRendererIfNeeded();
+
+    StyleSelectorParentPusher parentPusher(this);
+    if (firstChild())
+        parentPusher.push();
     ContainerNode::attach();
     if (hasRareData()) {   
         ElementRareData* data = rareData();
@@ -916,7 +947,7 @@ void Element::recalcStyle(StyleChange change)
                 change = ch;
         }
     }
-
+    StyleSelectorParentPusher parentPusher(this);
     // FIXME: This check is good enough for :hover + foo, but it is not good enough for :hover + foo + bar.
     // For now we will just worry about the common case, since it's a lot trickier to get the second case right
     // without doing way too much re-resolution.
@@ -925,8 +956,10 @@ void Element::recalcStyle(StyleChange change)
         bool childRulesChanged = n->needsStyleRecalc() && n->styleChangeType() == FullStyleChange;
         if (forceCheckOfNextElementSibling && n->isElementNode())
             n->setNeedsStyleRecalc();
-        if (change >= Inherit || n->isTextNode() || n->childNeedsStyleRecalc() || n->needsStyleRecalc())
+        if (change >= Inherit || n->isTextNode() || n->childNeedsStyleRecalc() || n->needsStyleRecalc()) {
+            parentPusher.push();
             n->recalcStyle(change);
+        }
         if (n->isElementNode())
             forceCheckOfNextElementSibling = childRulesChanged && hasDirectAdjacentRules;
     }
@@ -1038,11 +1071,21 @@ void Element::childrenChanged(bool changedByParser, Node* beforeChange, Node* af
         checkForSiblingStyleChanges(this, renderStyle(), false, beforeChange, afterChange, childCountDelta);
 }
 
+void Element::beginParsingChildren()
+{
+    m_parsingChildrenFinished = false;
+    CSSStyleSelector* styleSelector = document()->styleSelectorIfExists();
+    if (styleSelector && attached())
+        styleSelector->pushParent(this);
+}
+
 void Element::finishParsingChildren()
 {
     ContainerNode::finishParsingChildren();
     m_parsingChildrenFinished = true;
     checkForSiblingStyleChanges(this, renderStyle(), true, lastChild(), 0, 0);
+    if (CSSStyleSelector* styleSelector = document()->styleSelectorIfExists())
+        styleSelector->popParent(this);
 }
 
 void Element::dispatchAttrRemovalEvent(Attribute*)
