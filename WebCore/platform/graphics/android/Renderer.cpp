@@ -137,6 +137,7 @@ class RendererImpl : public Renderer, public WebTech::IBackingStore::IUpdater {
         bool needRedraw;
         bool scrolling;
         bool zooming;
+        bool changingBuffer;
     };
 
     struct RendererConfig {
@@ -1018,10 +1019,6 @@ public:
             return false;
         LOG_RENDER("drawContentGL");
 
-        processDeleteList();
-
-        GLResourceUsers::getGLResourceUsers()->getGLResource(this);
-
 #ifdef DO_LOG_RENDER
         if (s_log) {
             SLOGV("  viewRect (%d, %d) w = %d, h = %d.", viewRect.x(), viewRect.y(), viewRect.width(), viewRect.height());
@@ -1293,26 +1290,34 @@ private:
         return clip;
     }
 
-    bool detectInteractiveZoom(RenderTask& request)
+    bool detectInteractiveZoom(RenderTask& request, RenderTask& zoomRequest)
     {
         bool ret = false;
 
-        if (RendererConfig::getConfig()->enableZoom && !m_request.useGL && m_request.valid && (request.contentScale != m_request.contentScale) && request.quality == RenderTask::LOW) {
+        if (!request.changingBuffer) {
+            if (RendererConfig::getConfig()->enableZoom && !m_request.useGL && m_request.valid && (request.contentScale != m_request.contentScale) && request.quality == RenderTask::LOW) {
                 LOG_RENDER("Renderer client detected interactive zoom");
                 request.zooming = true;
                 ret = true;
-        } else if (m_request.useGL || !RendererConfig::getConfig()->enableZoom) {
-            if (request.contentScale != m_lastScale)
-                m_numTimesScaleUnchanged = 0;
-            else if (m_numTimesScaleUnchanged < RendererConfig::getConfig()->interactiveZoomDelayUpdate)
+            } else if (m_request.useGL || !RendererConfig::getConfig()->enableZoom) {
+                if (request.contentScale != m_lastScale)
+                    m_numTimesScaleUnchanged = 0;
+                else if (m_numTimesScaleUnchanged < RendererConfig::getConfig()->interactiveZoomDelayUpdate)
                     ++m_numTimesScaleUnchanged;
 
-            if (m_request.valid && (m_numTimesScaleUnchanged < RendererConfig::getConfig()->interactiveZoomDelayUpdate)) {
-                LOG_RENDER("Renderer client detected interactive zoom");
-                request.needRedraw = true;
-                request.zooming = true;
-                ret = true;
+                if (m_request.valid && (m_numTimesScaleUnchanged < RendererConfig::getConfig()->interactiveZoomDelayUpdate)) {
+                    LOG_RENDER("Renderer client detected interactive zoom");
+                    request.needRedraw = true;
+                    request.zooming = true;
+                    ret = true;
+                }
             }
+        }
+        if (ret) {
+            zoomRequest = request;
+            zoomRequest.requestArea = m_request.requestArea;
+            zoomRequest.contentScale = m_request.contentScale;
+            zoomRequest.contentOrigin = m_request.contentOrigin;
         }
         m_lastScale = request.contentScale;
         return ret;
@@ -1398,6 +1403,7 @@ private:
         task.needRedraw = false;
         task.scrolling = false;
         task.zooming = false;
+        task.changingBuffer = false;
     }
 
 #if ENABLE(GPU_ACCELERATED_SCROLLING)
@@ -1479,6 +1485,7 @@ private:
         task.needRedraw = false;
         task.scrolling = false;
         task.zooming = false;
+        task.changingBuffer = false;
     }
 #endif // ENABLE(GPU_ACCELERATED_SCROLLING)
 
@@ -1489,8 +1496,18 @@ private:
         bool drawn = false;
         bool shouldUpdate = true;
         bool abort = false;
+        RenderTask zoomRequest;
 
-        bool interactiveZoom = detectInteractiveZoom(request);
+#if ENABLE(GPU_ACCELERATED_SCROLLING)
+        processDeleteList();
+        GLResourceUsers::getGLResourceUsers()->getGLResource(this);
+#endif
+
+        request.changingBuffer = m_request.valid && (request.config != m_request.config
+                           || request.viewportWidth != m_request.viewportWidth
+                           || request.viewportHeight != m_request.viewportHeight);
+
+        bool interactiveZoom = detectInteractiveZoom(request, zoomRequest);
         if (interactiveZoom && (!m_request.valid || !RendererConfig::getConfig()->enableZoom) && m_request.canAbort) {
             shouldUpdate = false;
             if (m_backingStore)
@@ -1502,11 +1519,7 @@ private:
         handleNewContent(request);
 
         if (shouldUpdate) {
-            bool changingBuffer = m_request.valid && (request.config != m_request.config
-                           || request.viewportWidth != m_request.viewportWidth
-                           || request.viewportHeight != m_request.viewportHeight);
-
-            result = RenderRequest((interactiveZoom && !changingBuffer)? m_request : request);
+            result = RenderRequest((interactiveZoom)? zoomRequest : request);
         }
 
         if (result && !drawn)
