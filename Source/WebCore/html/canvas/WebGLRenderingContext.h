@@ -319,6 +319,7 @@ public:
 #endif
 
   private:
+    friend class WebGLFramebuffer;
     friend class WebGLObject;
     friend class OESVertexArrayObject;
 
