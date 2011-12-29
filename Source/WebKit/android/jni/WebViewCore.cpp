@@ -4811,6 +4811,11 @@ static void Pause(JNIEnv* env, jobject obj, jint nativeClass)
         Geolocation* geolocation = frame->domWindow()->navigator()->optionalGeolocation();
         if (geolocation)
             geolocation->suspend();
+#if ENABLE(WEBGL)
+        Document* document = frame->document();
+        if (document)
+            document->suspendDocument();
+#endif
     }
     if (mainFrame)
         mainFrame->settings()->setMinDOMTimerInterval(BACKGROUND_TIMER_INTERVAL);
@@ -4833,6 +4838,11 @@ static void Resume(JNIEnv* env, jobject obj, jint nativeClass)
         Geolocation* geolocation = frame->domWindow()->navigator()->optionalGeolocation();
         if (geolocation)
             geolocation->resume();
+#if ENABLE(WEBGL)
+        Document* document = frame->document();
+        if (document)
+            document->resumeDocument();
+#endif
     }
     if (mainFrame)
         mainFrame->settings()->setMinDOMTimerInterval(FOREGROUND_TIMER_INTERVAL);

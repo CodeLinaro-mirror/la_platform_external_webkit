@@ -1044,6 +1044,15 @@ public:
     void initializeWMLPageState();
 #endif
     
+#if ENABLE(WEBGL) && PLATFORM(ANDROID)
+    void setContainsWebGLContent(bool value) { m_containsWebGLContent = value; }
+    bool containsWebGLContent() const { return m_containsWebGLContent; }
+    void suspendDocument();
+    void resumeDocument();
+    void registerForDocumentSuspendCallbacks(Element*);
+    void unregisterForDocumentSuspendCallbacks(Element*);
+#endif
+
     bool containsValidityStyleRules() const { return m_containsValidityStyleRules; }
     void setContainsValidityStyleRules() { m_containsValidityStyleRules = true; }
 
@@ -1388,6 +1397,11 @@ private:
 
 #if ENABLE(WML)
     bool m_containsWMLContent;
+#endif
+
+#if ENABLE(WEBGL) && PLATFORM(ANDROID)
+    bool m_containsWebGLContent;
+    HashSet<Element*> m_documentSuspendCallbackElements;
 #endif
 
     RefPtr<DocumentWeakReference> m_weakReference;
