@@ -63,6 +63,10 @@
 #include "RenderVNode.h"
 #endif
 
+#if PLATFORM(ANDROID)
+#include "GraphicsLayerAndroid.h"
+#endif
+
 using namespace std;
 
 namespace WebCore {
@@ -318,12 +322,14 @@ bool RenderLayerBacking::updateGraphicsLayerConfiguration()
         layerConfigChanged = true;
     }
 #endif
-    else if (renderer->isCanvas()){
+    else if (renderer->isCanvas()) {
         HTMLCanvasElement *canvas = static_cast<HTMLCanvasElement*>(renderer->node());
         if (canvas->isUsingGpuRendering())
-        {
+#if PLATFORM(ANDROID)
+            static_cast<GraphicsLayerAndroid*>(graphicsLayer())->setContentsToGPUCanvas(canvas->platformLayer());
+#else
             m_graphicsLayer->setContentsToCanvas(canvas->platformLayer());
-        }
+#endif
         layerConfigChanged = true;
     }
 
