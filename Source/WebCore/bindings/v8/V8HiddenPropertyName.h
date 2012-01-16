@@ -53,6 +53,8 @@ namespace WebCore {
         V8_HIDDEN_PROPERTIES(V8_DECLARE_PROPERTY);
 #undef V8_DECLARE_PROPERTY
 
+        static v8::Handle<v8::String> hiddenReferenceName(const char* name);
+
     private:
         static v8::Persistent<v8::String> createString(const char* key);
 #define V8_DECLARE_FIELD(name) v8::Persistent<v8::String> m_##name;
