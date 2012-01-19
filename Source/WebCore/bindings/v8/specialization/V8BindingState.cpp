@@ -36,6 +36,12 @@
 #include "V8Proxy.h"
 #include <wtf/StdLibExtras.h>
 
+#ifdef PROTEUS_DEVICE_API
+#include "Navigator.h"
+#include "DOMWindow.h"
+#include "NodeProxy.h"
+#endif
+
 namespace WebCore {
 
 State<V8Binding>* State<V8Binding>::Only()
@@ -52,6 +58,18 @@ DOMWindow* State<V8Binding>::activeWindow()
         // be the activeContext.
         activeContext = v8::Context::GetCurrent();
     }
+
+#ifdef PROTEUS_DEVICE_API
+    // check if the calling context is the node context associated with the current browser context
+    // if so, set the active context as the current browser context
+    DOMWindow *window = V8Proxy::retrieveWindow(v8::Context::GetCurrent());
+    NodeProxy *proxy = window->navigator()->nodeProxy();
+    if (proxy && proxy->node()->context() == activeContext) {
+        NODE_LOGI("%s, calling context is a node context, active context set to current", __FUNCTION__);
+        activeContext = v8::Context::GetCurrent();
+    }
+#endif
+
     return V8Proxy::retrieveWindow(activeContext);
 }
 

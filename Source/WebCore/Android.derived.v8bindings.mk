@@ -284,6 +284,10 @@ GEN := \
     $(intermediates)/bindings/V8ValidityState.h \
     $(intermediates)/bindings/V8VoidCallback.h
 
+ifeq ($(PROTEUS_DEVICE_API), true)
+GEN += \
+    $(intermediates)/bindings/V8HTMLVNodeElement.h
+endif
 
 $(GEN): PRIVATE_PATH := $(LOCAL_PATH)
 $(GEN): PRIVATE_CUSTOM_TOOL = SOURCE_ROOT=$(PRIVATE_PATH) perl -I$(PRIVATE_PATH)/bindings/scripts $(PRIVATE_PATH)/bindings/scripts/generate-bindings.pl --defines "$(FEATURE_DEFINES) LANGUAGE_JAVASCRIPT" --generator V8 --include dom --include html --outputdir $(dir $@) $<

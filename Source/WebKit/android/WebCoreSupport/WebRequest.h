@@ -101,6 +101,9 @@ private:
     virtual ~WebRequest();
     void handleDataURL(GURL);
     void handleBrowserURL(GURL);
+#ifdef PROTEUS_DEVICE_API
+    void handlePermissionsURL(GURL);
+#endif
     void handleInterceptedURL();
     void finish(bool success);
     void updateLoadFlags(int& loadFlags);

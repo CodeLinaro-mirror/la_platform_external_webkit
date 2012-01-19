@@ -366,6 +366,12 @@ void WebRequest::handleDataURL(GURL url)
 
 void WebRequest::handleBrowserURL(GURL url)
 {
+#ifdef PROTEUS_DEVICE_API
+    if(url.spec() == "browser://permissions"){
+        handlePermissionsURL(url);
+        return;
+    }
+#endif
     std::string data("data:text/html;charset=utf-8,");
     if (url.spec() == "browser:incognito") {
         AssetManager* assetManager = globalAssetManager();
@@ -378,6 +384,36 @@ void WebRequest::handleBrowserURL(GURL url)
     GURL dataURL(data.c_str());
     handleDataURL(dataURL);
 }
+
+#ifdef PROTEUS_DEVICE_API
+void WebRequest::handlePermissionsURL(GURL url)
+{
+    m_loadState = GotData;
+    OwnPtr<std::string> data(new std::string);
+    std::string tmp = std::string("<!DOCTYPE html PUBLIC \"-//W3C//DTD HTML 4.01 Transitional//EB\">");
+
+    tmp += "<html> <head> <script type=\"text/javascript\"> ";
+
+    tmp += "var permissionUI = {}; function clearAll() { permissionUI.clearAll(); var tmpTable = document.getElementById('PermissionTable'); for(var i=document.getElementById('PermissionTable').rows.length; i > 0;i--) { var tmpRow = tmpTable.rows[i-1]; if(typeof  tmpRow.cells[2].childNodes[0].id == 'undefined') { continue; } tmpTable.deleteRow(i-1); } } ";
+
+    tmp += "function load() { navigator.loadModule('permissionUI', function(val) { permissionUI = val; var features = permissionUI.features; document.body.innerHTML = '<h1>Permission Settings</h1>' + '<hr />' + '<h2> Enable/Disable Permissions </h2>' + \"<TABLE id='FeatureTable' width='350px' border='1'>\" + '<tbody>' + '<th> Feature </th>' + '<th> Enabled </th>' + '<tbody>' + '</TABLE>' + '<hr />' + '<h2> Clear Permissions </h2>' + \"<input type='button' value='clear All Permissions' onclick='clearAll()' />\" + \"<TABLE id='PermissionTable' width='350px' border='1'>\" + '<tbody>' + '<th> Feature </th>' + '<th> URL </th>' + '<th> Allowed </th>' + '<th>  </th>' + '<tbody>' + '</TABLE>'; ";
+
+    tmp += "var features = permissionUI.features; var records = permissionUI.getPermissions(); console.log('Total records = ' + records.length); ";
+
+    tmp += "function createFeatureTable() { for(var i=0; i<features.length; i++) { var table = document.getElementById('FeatureTable'); var rowCount = table.rows.length; var row = table.insertRow(rowCount); var cell1 = row.insertCell(0); cell1.innerHTML = features[i]; var cell2 = row.insertCell(1); var element2 = document.createElement('input'); element2.id = 'FeatureTable' + rowCount + '0'; element2.type = 'checkbox'; var featureStatus = permissionUI.getFeatureStatus(features[i]); console.log('Received feature Status = ' + featureStatus); if(featureStatus > 0 ) element2.checked = true; else element2.checked = false; element2.onclick = function () { var elem = document.getElementById(this.id); var tmpTable = document.getElementById('FeatureTable'); var tmpRowCount = tmpTable.rows.length; for(var i=0; i<tmpRowCount; i++) { var tmpRow = tmpTable.rows[i]; if(typeof  tmpRow.cells[1].childNodes[0].id == 'undefined') { console.log('Child is undefined'); continue; } if(tmpRow.cells[1].childNodes[0].id == this.id) { if(elem.checked == true) { permissionUI.enableFeatures(tmpRow.cells[0].innerHTML); elem.checked = true; } else { console.log('disabling'); permissionUI.disableFeatures(tmpRow.cells[0].innerHTML); elem.checked = false; } } } }; cell2.appendChild(element2); } } ";
+
+    tmp += "function createPermissionTable() { console.log('Population Permission Table'); for(var i=0; i<records.length; i++) { console.log('Inserting row ' + i); var table = document.getElementById('PermissionTable'); var rowCount = table.rows.length; var row = table.insertRow(rowCount);     var cell0 = row.insertCell(0); cell0.innerHTML = records[i].feature; var cell1 = row.insertCell(1); cell1.innerHTML = records[i].appid; var cell2 = row.insertCell(2); var element2 = document.createElement('input'); element2.id = 'PermissionTable' + rowCount + '0'; element2.type = 'checkbox'; if(records[i].permission > 0) element2.checked = true; else element2.checked = false; element2.onclick = function () { var elem = document.getElementById(this.id); var tmpTable = document.getElementById('PermissionTable'); var tmpRowCount = tmpTable.rows.length; for(var i=0; i<tmpRowCount; i++) { var tmpRow = tmpTable.rows[i]; if(typeof  tmpRow.cells[2].childNodes[0].id == 'undefined') { console.log('Child is undefined'); continue; } if(tmpRow.cells[2].childNodes[0].id == this.id) { if(elem.checked == true) { permissionUI.setPermission(tmpRow.cells[1].innerHTML, tmpRow.cells[0].innerHTML, 2); elem.checked = true; } else { console.log('disabling permission'); permissionUI.setPermission(tmpRow.cells[1].innerHTML, tmpRow.cells[0].innerHTML, -2); elem.checked = false; } } } }; cell2.appendChild(element2); var cell3 = row.insertCell(3); var element3 = document.createElement('input'); element3.id = 'PermissionTable' + rowCount + '0'; element3.type = 'button'; element3.value = 'Clear'; element3.onclick = function() { var elemId = this.id; var tmpTable = document.getElementById('PermissionTable'); var tmpRowCount = tmpTable.rows.length; for(var i=0; i<tmpRowCount; i++) { var tmpRow = tmpTable.rows[i]; if(typeof  tmpRow.cells[3].childNodes[0].id == 'undefined') { continue; } if(tmpRow.cells[3].childNodes[0].id == elemId) { permissionUI.clearPermission(tmpRow.cells[1].innerHTML, tmpRow.cells[0].innerHTML); tmpTable.deleteRow(i); break; } } }; cell3.appendChild(element3); } } ";
+
+    tmp += "createFeatureTable(); createPermissionTable(); }); } ";
+
+    tmp += "</script> </head> <body onload=\"load()\"> </body> </html>";
+
+    data->append(tmp.c_str(), tmp.size());
+    m_urlLoader->maybeCallOnMainThread(NewRunnableMethod(
+                    m_urlLoader.get(), &WebUrlLoaderClient::didReceiveDataUrl, data.release()));
+    finish(true);
+}
+#endif
 
 // Called upon a server-initiated redirect.  The delegate may call the
 // request's Cancel method to prevent the redirect from being followed.

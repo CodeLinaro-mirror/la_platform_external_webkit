@@ -26,23 +26,24 @@
  * OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN
  * IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
+#ifdef PROTEUS_DEVICE_API
+
 #include "config.h"
-#include "V8Proxy.h"
-#include "JavaSharedClient.h"
-#include "JNIUtility.h"
 #include "MainThread.h"
 #include "text/CString.h"
-#include "HTMLVideoElement.h"
-#include "V8HTMLVideoElement.h"
 #include "Page.h"
 #include "Chrome.h"
 #include "WebViewCore.h"
-#include "DOMWindow.h"
 #include "Navigator.h"
 #include "NodeProxy.h"
 #include <vector>
 
+#include "HTMLNames.h"
+#include "V8HTMLVNodeElement.h"
+#include "V8ArrayBuffer.h"
+
 namespace WebCore {
+using namespace android;
 using namespace v8;
 using WTF::String;
 
@@ -91,7 +92,7 @@ NodeProxy::NodeProxy(Frame* frame)
   if (!s_nodeInitialized) {
     NODE_ASSERT(s_moduleRootPath);
     NODE_LOGI("%s, rootModulePath(%s)", __FUNCTION__, s_moduleRootPath->latin1().data());
-    node::Node::Initialize(true, s_moduleRootPath->latin1().data());
+    node::Node::Initialize(HandleInvokePending, true, s_moduleRootPath->latin1().data());
     s_nodeInitialized = true;
   }
 
@@ -100,62 +101,33 @@ NodeProxy::NodeProxy(Frame* frame)
   m_node = new node::Node(this);
 }
 
+std::string NodeProxy::GetEnvironmentProperty(const char *type, bool privateType){
+  WebViewCore* webViewCore = android::WebViewCore::getWebViewCore(m_frame->view());
+  return webViewCore->getEnvironmentProperty(type, privateType);
+}
+
 std::string NodeProxy::url() {
   NODE_ASSERT(m_frame);
+  NODE_LOGV("%s, URL for the NodeProxy %p, frame %p: %s", __FUNCTION__, this, m_frame,
+      m_frame->document()->url().string().latin1().data());
   return m_frame->document()->url().string().latin1().data();
 }
 
-class NodeProxyTimer : public TimerBase {
+class InvokePendingTimer : public TimerBase {
   public:
-    NodeProxyTimer(node::NodeEvent event) : m_event(event) {}
+    static void handleOnMainThread(void* data) {
+      InvokePendingTimer *timer = static_cast<InvokePendingTimer*>(data);
+      timer->startOneShot(0.01); // 10ms
+    }
 
-  private:
-    virtual void fired();
-    node::NodeEvent m_event;
+    virtual void fired() {
+      node::Node::InvokePending();
+      node::Node::CheckTestStatus();
+      delete this;
+    }
 };
 
-void NodeProxyTimer::fired() {
-  NODE_LOGM("%s(tid=%d)", __FUNCTION__, gettid());
-
-  v8::HandleScope scope;
-  if (m_event.type == node::NODE_EVENT_LIBEV_INVOKE_PENDING){
-    if (node::Node::InvokePending()) {
-      // atleast one node is done processing
-      node::Node::CheckTestStatus(false);
-    }
-  } else if (m_event.type == node::NODE_EVENT_LIBEV_DONE) {
-    node::Node::CheckTestStatus(true);
-  } else {
-    NODE_LOGE("%s, unexpected event type : %d", __PRETTY_FUNCTION__, m_event.type);
-    NODE_ASSERT(0);
-  }
-  delete this;
-}
-
-// we lower the priority of the nodejs event handling by running
-// it in a timer, this for e.g. allows the painting thread to run
-void NodeProxy::handleNodeEventMainThread(void* data) {
-  NODE_LOGM("%s", __FUNCTION__);
-  NodeProxyTimer *timer = static_cast<NodeProxyTimer*>(data);
-  timer->startOneShot(0.01); // 10ms
-}
-
-void NodeProxy::handleNodeEventEvThread(node::NodeEvent *ev) {
-  NODE_LOGM("%s(tid=%d)", __FUNCTION__, gettid());
-  NODE_ASSERT(ev->type ==  node::NODE_EVENT_LIBEV_DONE || ev->type == node::NODE_EVENT_LIBEV_INVOKE_PENDING);
-  NodeProxyTimer *timer = new NodeProxyTimer(*ev);
-  ::android::JavaSharedClient::EnqueueFunctionPtr(handleNodeEventMainThread, timer);
-  NODE_LOGM("%s(tid=%d), enqueued event on to main thread", __FUNCTION__, gettid());
-}
-
 void NodeProxy::HandleNodeEvent(node::NodeEvent *ev) {
-  // libev callbacks are invoked on the libev thread
-  if (ev->type == node::NODE_EVENT_LIBEV_DONE || ev->type == node::NODE_EVENT_LIBEV_INVOKE_PENDING) {
-    NODE_ASSERT(!isMainThread());
-    return handleNodeEventEvThread(ev);
-  }
-
-  // All other callbacks should be called on the webcore thread
   NODE_LOGI("Node Bridge event type: %d", ev->type);
   NODE_ASSERT(isMainThread()); // should be called only on the main thread
   switch (ev->type) {
@@ -171,6 +143,14 @@ void NodeProxy::HandleNodeEvent(node::NodeEvent *ev) {
       NODE_ASSERT(0);
       break;
   }
+}
+
+void NodeProxy::HandleInvokePending() {
+  NODE_LOGF();
+
+  NODE_ASSERT(!isMainThread());
+  InvokePendingTimer *timer = new InvokePendingTimer;
+  callOnMainThread(InvokePendingTimer::handleOnMainThread, timer);
 }
 
 void NodeProxy::OnTestDone() {
@@ -201,22 +181,14 @@ void NodeProxy::disconnectFrame() {
 
 // Handle browser focusin/out events
 void NodeProxy::pause() {
-  NODE_LOGI("%s", __PRETTY_FUNCTION__);
-  if (m_node) {
-    node::WebKitEvent e;
-    e.type = node::WEBKIT_EVENT_PAUSE;
-    m_node->HandleWebKitEvent(&e);
-  }
+  NODE_LOGF();
+  m_node->Pause();
 }
 
 // Handle browser focusin/out events
 void NodeProxy::resume() {
-  NODE_LOGI("%s", __PRETTY_FUNCTION__);
-  if (m_node) {
-    node::WebKitEvent e;
-    e.type = node::WEBKIT_EVENT_RESUME;
-    m_node->HandleWebKitEvent(&e);
-  }
+  NODE_LOGF();
+  m_node->Resume();
 }
 
 // This is the app path on the device to install app specific files
@@ -227,4 +199,39 @@ void NodeProxy::setAppDataPath(const String& dataPath) {
   s_moduleRootPath = new String(dataPath);
 }
 
+node::NodeView* NodeProxy::Unwrap(Handle<Object> v8VNodeObject) {
+  NODE_LOGF();
+
+  HTMLVNodeElement* vnode = V8HTMLVNodeElement::toNative(v8VNodeObject);
+  return static_cast<node::NodeView*>(vnode);
 }
+
+v8::Handle<v8::Value> NodeProxy::CreatePreviewNode(node::NodeSource *source) {
+  NODE_LOGF();
+
+  // use caller scope, create the element in browser context..
+  v8::Local<v8::Context> context = V8Proxy::mainWorldContext(m_frame);
+  v8::Context::Scope scope(context);
+
+  // create the element in browser context..
+  PassRefPtr<HTMLVNodeElement> vnode =
+    HTMLVNodeElement::create(HTMLNames::vnodeTag, m_frame->document(), source);
+
+  // wrap in v8 object and return the reference, the vnode is owned by the js handle
+  return toV8(vnode);
+}
+
+v8::Handle<v8::Value> NodeProxy::CreateArrayBuffer(void *buf, int size) {
+  NODE_LOGF();
+
+  // use caller scope, create the element in browser context..
+  v8::Local<v8::Context> context = V8Proxy::mainWorldContext(m_frame);
+  v8::Context::Scope scope(context);
+
+  PassRefPtr<ArrayBuffer> arrayBuffer = ArrayBuffer::create(buf, size);
+  return toV8(arrayBuffer);
+}
+
+}
+
+#endif

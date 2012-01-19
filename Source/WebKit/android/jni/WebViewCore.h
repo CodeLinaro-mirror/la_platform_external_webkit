@@ -286,6 +286,10 @@ namespace android {
          * Instruct the browser to hide the feature permission prompt.
          */
         void navigatorPermissionsHidePrompt();
+        /**
+         * Get environment property from android system
+         */
+        std::string getEnvironmentProperty(const char *, bool privateType);
 
 #endif
         jobject getDeviceMotionService();

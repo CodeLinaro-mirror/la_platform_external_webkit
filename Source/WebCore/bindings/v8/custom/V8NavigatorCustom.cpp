@@ -119,29 +119,23 @@ v8::Handle<v8::Value> V8Navigator::isApplicationInstalledCallback(const v8::Argu
 #endif // PLATFORM(ANDROID) && ENABLE(APPLICATION_INSTALLED)
 
 #ifdef PROTEUS_DEVICE_API
-// REQ: browser will expose a new api navigator.loadModule(<module>) to load a node module
+// window.navigator.loadModule(module, successcb, failurecb)
 v8::Handle<v8::Value> V8Navigator::loadModuleCallback(const v8::Arguments& args) {
-  // This should be called only once after which we patch it
-  static bool s_invoked = false;
-  if (s_invoked) {
-    // This means the previous loadModule didnt go through (e.g. eval reported an error)
-    NODE_LOGW("%s, invoked again, previous loadModule possibly failed", __FUNCTION__);
-  } else {
-    s_invoked = true;
-  }
+  v8::HandleScope scope;
 
-  // REQ: loadModule takes a module name, a success callback and a optional errorcb
+  // loadModule takes a module name, a success callback and a optional errorcb
   if (args[0].IsEmpty() || args[1].IsEmpty() || !args[0]->IsString() || !args[1]->IsFunction()) {
     return v8::ThrowException(v8::String::New("Invalid arguments to loadModule"));
   }
 
   Navigator* navigator = V8Navigator::toNative(args.Holder());
   NODE_ASSERT(navigator);
-  if (!navigator)
+  if (!navigator) {
     return v8::Undefined();
+  }
 
-  // REQ: node is loaded on demand (on the first loadModule) and  it should not
-  //   >:impact the webpage load if its not used
+  // node is loaded on demand (on the first loadModule) and  it should not
+  // impact the webpage load if its not used
   NodeProxy* nodeProxy = navigator->createNodeProxy();
   NODE_ASSERT(nodeProxy->node());
   v8::Handle<v8::Function> loadModule = nodeProxy->node()->GetLoadModule();

@@ -59,6 +59,13 @@
 #include "GraphicsContext3D.h"
 #endif
 
+#ifdef PROTEUS_DEVICE_API
+#include "RenderVNode.h"
+#undef LOG_TAG_NODE
+#define LOG_TAG_NODE "RenderLayerBacking"
+#include <node.h>
+#endif
+
 using namespace std;
 
 namespace WebCore {
@@ -296,6 +303,14 @@ bool RenderLayerBacking::updateGraphicsLayerConfiguration()
     else if (renderer->isVideo()) {
         HTMLMediaElement* mediaElement = static_cast<HTMLMediaElement*>(renderer->node());
         m_graphicsLayer->setContentsToMedia(mediaElement->platformLayer());
+    }
+#endif
+#ifdef PROTEUS_DEVICE_API
+    // proteus: vnode element
+    else if (renderer->isVNode()) {
+        NODE_LOGF();
+        RenderVNode* renderVNode = static_cast<RenderVNode*>(renderer);
+        m_graphicsLayer->setContentsToMedia(renderVNode->platformLayer());
     }
 #endif
 #if ENABLE(WEBGL) || ENABLE(ACCELERATED_2D_CANVAS)

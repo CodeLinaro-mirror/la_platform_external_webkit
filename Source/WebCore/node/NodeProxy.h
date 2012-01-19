@@ -29,11 +29,14 @@
 #ifndef NODE_PROXY_H
 #define NODE_PROXY_H
 
+#ifdef PROTEUS_DEVICE_API
+
 #include <wtf/PassRefPtr.h>
 #include <wtf/RefCounted.h>
 
 #include "Frame.h"
 #include <node.h>
+#include <v8.h>
 
 namespace WebCore {
   // NodeProxy is the webcore side object for a node instance
@@ -61,11 +64,19 @@ namespace WebCore {
       // for installing and looking up node modules
       static void setAppDataPath(const String&);
 
-      // NodeClient interface, handles events from node
-      void HandleNodeEvent(node::NodeEvent *ev);
-      void OnDelete();
-      void OnTestDone();
-      std::string url();
+      // handles request from node ev thread, will schedule
+      // the request on the webcore thread
+      static void HandleInvokePending();
+
+      // NodeClient interface
+      virtual void HandleNodeEvent(node::NodeEvent *ev);
+      virtual void OnDelete();
+      virtual void OnTestDone();
+      virtual std::string url();
+      virtual node::NodeView* Unwrap(v8::Handle<v8::Object> object);
+      virtual v8::Handle<v8::Value> CreatePreviewNode(node::NodeSource *);
+      virtual v8::Handle<v8::Value> CreateArrayBuffer(void *buf, int size);
+      virtual std::string GetEnvironmentProperty(const char *prop, bool );
 
       // accessors
       Frame *frame() const { return m_frame; }
@@ -79,7 +90,6 @@ namespace WebCore {
       void handleRegisterPrivilegedFeaturesEvent(node::NodeEvent *ev);
       void handleCameraPreviewFrameEvent(node::NodeEvent *ev);
       void handleRequestPermission(node::NodeEvent *ev);
-
       NodeProxy(Frame*);
       Frame *m_frame;
       node::Node *m_node;
@@ -88,5 +98,6 @@ namespace WebCore {
   };
 }
 
+#endif
 #endif
 

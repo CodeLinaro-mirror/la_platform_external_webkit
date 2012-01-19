@@ -303,6 +303,11 @@ public:
     virtual bool isRenderFullScreen() const { return false; }
 #endif
 
+#ifdef PROTEUS_DEVICE_API
+    // proteus:
+    virtual bool isVNode() const { return false; }
+#endif
+
     bool isRoot() const { return document()->documentElement() == m_node; }
     bool isBody() const;
     bool isHR() const;

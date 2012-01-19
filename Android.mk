@@ -277,9 +277,9 @@ endif
 ifeq ($(PROTEUS_DEVICE_API), true)
 LOCAL_C_INCLUDES := $(LOCAL_C_INCLUDES) \
         $(WEBCORE_PATH)/node \
-        external/node/src \
-        external/node/deps/uv/include \
-        external/node/deps/uv/src/ev
+        external/node/nodejs/src \
+        external/node/nodejs/deps/uv/include \
+        external/node/nodejs/deps/uv/src/ev
 
 LOCAL_CFLAGS := $(LOCAL_CFLAGS) \
          -DLOG_TAG_NODE=\"webkit-node\"
