@@ -132,6 +132,16 @@ void ImageBuffer::copyRecordingToLayer( GraphicsContext* paintContext, const Int
     clearRecording();
 }
 
+void ImageBuffer::resetRecordingToLayer( GraphicsContext* paintContext, const IntRect& r,
+                                         CanvasLayerAndroid* canvasLayer) const
+{
+    SkPicture* canvasRecording = new SkPicture();
+    SkPicture dstPicture(*canvasRecording);
+    canvasLayer->setPicture(dstPicture);
+    canvasLayer->setRect(r);
+    clearRecording();
+}
+
 void ImageBuffer::copyRecordingToCanvas(GraphicsContext* paintContext, const IntRect& r) const
 {
     SkCanvas* paintCanvas = paintContext->platformContext()->mCanvas;
