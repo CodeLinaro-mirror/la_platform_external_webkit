@@ -53,6 +53,7 @@
 #if ENABLE(WEBGL)
 namespace WebCore {
 
+#define OLD_GRAPHICBUFFER_ALLOC
 class FBO {
 public:
     static FBO* createFBO(EGLDisplay dpy, int width, int height);
@@ -436,6 +437,10 @@ bool FBO::init(int width, int height)
         return false;
     }
 
+#ifndef OLD_GRAPHICBUFFER_ALLOC
+    m_graphicBufferAlloc = 0;
+#endif
+
     void *addr = 0;
     if (m_grBuffer->lock(GRALLOC_USAGE_SW_WRITE_RARELY, &addr) != NO_ERROR) {
         LOGWEBGL("  failed to lock the GraphicBuffer");
@@ -511,6 +516,10 @@ FBO::~FBO()
         eglDestroyImageKHR(m_dpy, m_image);
         GraphicsContext3DInternal::checkEGLError("eglDestroyImageKHR");
     }
+#ifdef OLD_GRAPHICBUFFER_ALLOC
+    if (m_graphicBufferAlloc != 0)
+        m_graphicBufferAlloc->freeAllGraphicBuffersExcept(-1);
+#endif
     if (m_texture)
         glDeleteTextures(1, &m_texture);
     if (m_depthBuffer)
