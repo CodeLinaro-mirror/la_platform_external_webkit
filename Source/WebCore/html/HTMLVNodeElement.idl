@@ -1,0 +1,6 @@
+module html {
+    interface HTMLVNodeElement : HTMLElement {
+        attribute unsigned long width;
+        attribute unsigned long height;
+    };
+}

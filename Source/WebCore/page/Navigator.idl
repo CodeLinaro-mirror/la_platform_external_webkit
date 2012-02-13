@@ -69,6 +69,7 @@ module window {
                                                            in [Callback=FunctionOnly] NavigatorUserMediaSuccessCallback successCallback,
                                                            in [Callback=FunctionOnly, Optional] NavigatorUserMediaErrorCallback errorCallback);
 #endif
+
 #ifdef PROTEUS_DEVICE_API
         // proteus: loadModule
         [Custom] void loadModule(in DOMString modName,

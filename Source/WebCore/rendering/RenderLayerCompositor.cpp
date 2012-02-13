@@ -64,6 +64,10 @@
 #include "RenderTreeAsText.h"
 #endif
 
+#ifdef PROTEUS_DEVICE_API
+#include <node.h>
+#endif
+
 #if ENABLE(3D_RENDERING)
 // This symbol is used to determine from a script whether 3D rendering is enabled (via 'nm').
 bool WebCoreHas3DRendering = true;
@@ -1402,6 +1406,9 @@ bool RenderLayerCompositor::requiresCompositingLayer(const RenderLayer* layer) c
     return requiresCompositingForTransform(renderer)
 #if PLATFORM(ANDROID)
              || requiresCompositingForAndroidLayers(layer)
+#endif
+#ifdef PROTEUS_DEVICE_API
+             || renderer->isVNode() // proteus: vnode needs a compositing layer
 #endif
              || requiresCompositingForVideo(renderer)
              || requiresCompositingForCanvas(renderer)

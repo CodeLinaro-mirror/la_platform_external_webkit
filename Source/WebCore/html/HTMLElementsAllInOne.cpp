@@ -109,3 +109,7 @@
 #include "HTMLTitleElement.cpp"
 #include "HTMLUListElement.cpp"
 #include "HTMLVideoElement.cpp"
+
+#ifdef PROTEUS_DEVICE_API
+#include "HTMLVNodeElement.cpp"
+#endif

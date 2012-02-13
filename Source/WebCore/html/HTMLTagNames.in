@@ -21,6 +21,7 @@ blockquote
 body
 br interfaceName=HTMLBRElement
 button constructorNeedsFormElement
+vnode interfaceName=HTMLVNodeElement, conditional=PROTEUS_DEVICE_API
 canvas
 caption interfaceName=HTMLTableCaptionElement
 center interfaceName=HTMLElement

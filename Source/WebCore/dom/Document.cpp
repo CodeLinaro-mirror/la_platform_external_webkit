@@ -4949,6 +4949,10 @@ void Document::webkitWillExitFullScreenForElement(Element*)
         m_fullScreenRenderer->setAnimating(true);
 #if USE(ACCELERATED_COMPOSITING)
         view()->updateCompositingLayers();
+#if PLATFORM(ANDROID)
+        if (!m_fullScreenRenderer->layer())
+            return;
+#endif
         if (m_fullScreenRenderer->layer()->isComposited())
             page()->chrome()->client()->setRootFullScreenLayer(m_fullScreenRenderer->layer()->backing()->graphicsLayer());
 #endif

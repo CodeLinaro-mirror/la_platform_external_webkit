@@ -3519,13 +3519,13 @@ void WebViewCore::navigatorPermissionsShowPrompt(const Vector<String>& features,
     LOG_ASSERT(features,"Feature list can never be NULL");
     JNIEnv* env = JSC::Bindings::getJNIEnv();
     jclass vectorClass = env->FindClass("java/util/Vector");
-    LOG_ASSERT(mapClass, "Could not find Vector class!");
+    LOG_ASSERT(vectorClass, "Could not find Vector class!");
 
     jobject vectorObj = env->NewObject(vectorClass, env->GetMethodID(vectorClass, "<init>", "()V"));
     LOG_ASSERT(vectorObj, "Could not create a new Vector object");
 
     jmethodID addMethod = env->GetMethodID(vectorClass, "add","(ILjava/lang/Object;)V");
-    LOG_ASSERT(put, "Could not find add method on Vector");
+    LOG_ASSERT(addMethod, "Could not find add method on Vector");
 
     for (unsigned int n=0; n<features.size(); n++) {
         if (features[n].length() == 0 ) continue;
@@ -3549,6 +3549,54 @@ void WebViewCore::navigatorPermissionsHidePrompt()
     env->CallVoidMethod(m_javaGlue->object(env).get(),
                         m_javaGlue->m_navigatorPermissionsHidePrompt);
     checkException(env);
+}
+
+std::string WebViewCore::getEnvironmentProperty(const char *type, bool privateType)
+{
+    if (type == NULL) {
+      return std::string();
+    }
+    JNIEnv* env = JSC::Bindings::getJNIEnv();
+    jobject fileObj ;
+    if(!privateType){
+      jclass envClass = env->FindClass("android/os/Environment");
+      LOG_ASSERT(envClass, "Could not query Environment class");
+      jmethodID getExternalStoragePublicMethod = env->GetStaticMethodID(envClass, "getExternalStoragePublicDirectory",  "(Ljava/lang/String;)Ljava/io/File;");
+      if (getExternalStoragePublicMethod == NULL) {
+        __android_log_print(ANDROID_LOG_DEBUG, "WebViewCore", "getExternalStoragePublic Method not found");
+        checkException(env);
+        return std::string();
+      }
+      jstring javaType = env->NewStringUTF(type);
+      fileObj = env->CallStaticObjectMethod(envClass, getExternalStoragePublicMethod, javaType);
+      if (!fileObj){
+        __android_log_print(ANDROID_LOG_DEBUG, "WebViewCore", "getExternalStoragePublic Method returned no match for : %s", type);
+      }
+    }
+    else{
+      __android_log_print(ANDROID_LOG_DEBUG, "WebViewCore", "Private Environment Property not supported");
+      return std::string();
+    }
+    jclass fileClass = env->FindClass("java/io/File");
+    LOG_ASSERT(fileClass, "Could not create File Class ");
+    jmethodID getPathMethod = env->GetMethodID(fileClass, "getPath", "()Ljava/lang/String;");
+    LOG_ASSERT(fileClass, "Could not get getPath Method");
+    if (getPathMethod == NULL) {
+      __android_log_print(ANDROID_LOG_DEBUG, "WebViewCore", "getPath not found");
+      checkException(env);;
+      return std::string();
+    }
+    jstring pathObj = (jstring)env->CallObjectMethod(fileObj, getPathMethod);
+    if (!pathObj){
+       __android_log_print(ANDROID_LOG_DEBUG, "WebViewCore", "getPath returned no match");
+    }
+    const char* path = env->GetStringUTFChars(pathObj, NULL);
+    if (!path)
+      return std::string();
+    std::string returnPath(path);
+    env->ReleaseStringUTFChars(pathObj, path);
+    checkException(env);
+    return returnPath;
 }
 
 #endif
