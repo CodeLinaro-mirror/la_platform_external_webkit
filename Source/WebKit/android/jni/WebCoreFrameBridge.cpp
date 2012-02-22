@@ -1,5 +1,6 @@
 /*
  * Copyright 2006, The Android Open Source Project
+ * Copyright (c) 2012 Code Aurora Forum. All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions
@@ -119,6 +120,10 @@
 #include "V8Counters.h"
 #endif  // USE(JSC)
 
+#include <cutils/properties.h>
+
+extern "C" void SetCloseUnUsedSocketsFlag();
+
 #ifdef ANDROID_INSTRUMENT
 #include "TimeCounter.h"
 #endif
@@ -138,6 +143,8 @@ static String* gUploadFileLabel;
 static String* gResetLabel;
 static String* gSubmitLabel;
 static String* gNoFileChosenLabel;
+
+static int gPageLoadCounter = 0;
 
 String* WebCore::PlatformBridge::globalLocalizedName(
         WebCore::PlatformBridge::rawResId resId)
@@ -343,6 +350,14 @@ WebFrame::WebFrame(JNIEnv* env, jobject obj, jobject historyList, WebCore::Page*
     mUserInitiatedAction = false;
     mBlockNetworkLoads = false;
     m_renderSkins = 0;
+
+    mPageLoadStarted = false;
+    mCloseUnusedSocketsEnabled = false;
+    char netCloseUnusedSocketsSystemProperty[PROPERTY_VALUE_MAX];
+    if(property_get("net.close.unused.sockets",
+                    netCloseUnusedSocketsSystemProperty, "1")) {
+        mCloseUnusedSocketsEnabled = (bool)atoi(netCloseUnusedSocketsSystemProperty);
+    }
 }
 
 WebFrame::~WebFrame()
@@ -602,6 +617,12 @@ WebFrame::loadStarted(WebCore::Frame* frame)
 #if USE(CHROME_NETWORK_STACK)
     if (isMainFrame) {
         StatHubCmd(INPUT_CMD_WK_START_PAGE_LOAD, (void*)url.string().utf8().data(), strlen( url.string().utf8().data())+1, (void*)frame, 0);
+        if (true == mCloseUnusedSocketsEnabled) {
+            if (false == mPageLoadStarted) {
+                gPageLoadCounter++;
+                mPageLoadStarted = true;
+            }
+        }
     }
 #endif //  USE(CHROME_NETWORK_STACK)
 
@@ -691,6 +712,15 @@ WebFrame::didFinishLoad(WebCore::Frame* frame)
 #if USE(CHROME_NETWORK_STACK)
     if (isMainFrame) {
         StatHubCmd(INPUT_CMD_WK_FINISH_PAGE_LOAD, (void*)url.string().utf8().data(), strlen( url.string().utf8().data())+1, (void*)frame, 0);
+        if (true == mCloseUnusedSocketsEnabled) {
+            if ((gPageLoadCounter > 0) && (true == mPageLoadStarted)) {
+                mPageLoadStarted = false;
+                gPageLoadCounter--;
+                if(0 == gPageLoadCounter) {
+                    SetCloseUnUsedSocketsFlag();
+                }
+            }
+        }
     }
 #endif //  USE(CHROME_NETWORK_STACK)
 }
