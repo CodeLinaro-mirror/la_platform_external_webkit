@@ -50,32 +50,19 @@ using WTF::String;
 String* NodeProxy::s_moduleRootPath = 0;
 bool NodeProxy::s_nodeInitialized = false;
 
-void NodeProxy::handleRegisterPrivilegedFeaturesEvent(node::NodeEvent *ev) {
-  NODE_ASSERT(ev->type == node::NODE_EVENT_FP_REGISTER_PRIVILEGED_FEATURES);
-  node::RegisterPrivilegedFeaturesEvent *e = &ev->u.RegisterPrivilegedFeaturesEvent_;
-
-  Vector<String> featurelist;
-  Vector<std::string>::const_iterator filesEnd = e->features->end();
-
-  for (Vector<std::string>::const_iterator fileIterator = e->features->begin(); fileIterator != filesEnd; ++fileIterator) {
-    NODE_LOGI("feature vector data - %s", fileIterator->c_str());
-    featurelist.append(fileIterator->c_str());
-  }
-}
-
 void NodeProxy::handleRequestPermission(node::NodeEvent *ev) {
   NODE_ASSERT(ev->type == node::NODE_EVENT_FP_REQUEST_PERMISSION);
   node::RequestPermissionEvent *e = &ev->u.RequestPermissionEvent_;
 
   Vector<String> featurelist;
-  Vector<std::string>::const_iterator filesEnd = e->features->end();
-
-  for (Vector<std::string>::const_iterator fileIterator = e->features->begin(); fileIterator != filesEnd; ++fileIterator) {
-    NODE_LOGI("feature vector data - %s", fileIterator->c_str());
-    featurelist.append(fileIterator->c_str());
+  void* efeatures = e->features;
+  Handle<v8::Value> featureValue = *(Handle<v8::Value>*)efeatures;
+  Handle<Array> v8Features  = Handle<Array>::Cast(featureValue);
+  for(unsigned int i=0; i< v8Features->Length(); i++) {
+    v8::String::AsciiValue  featureName(v8Features->Get(i)->ToString());
+    featurelist.append(*featureName);
   }
 
-  //String appid = m_frame->document()->url().string();
   if(m_frame->page()) {
       m_frame->page()->chrome()->handleRequestPermission(m_frame, featurelist, e->context, e->callback);
   }
@@ -101,16 +88,20 @@ NodeProxy::NodeProxy(Frame* frame)
   m_node = new node::Node(this);
 }
 
-std::string NodeProxy::GetEnvironmentProperty(const char *type, bool privateType){
+const char* NodeProxy::GetEnvironmentProperty(const char *type, bool privateType){
   WebViewCore* webViewCore = android::WebViewCore::getWebViewCore(m_frame->view());
-  return webViewCore->getEnvironmentProperty(type, privateType);
+  static std::string path;
+  path = webViewCore->getEnvironmentProperty(type, privateType);
+  NODE_LOGV("%s Environment property %s", __FUNCTION__ , path.c_str());
+  return path.c_str();
 }
 
-std::string NodeProxy::url() {
+const char* NodeProxy::url() {
   NODE_ASSERT(m_frame);
-  NODE_LOGV("%s, URL for the NodeProxy %p, frame %p: %s", __FUNCTION__, this, m_frame,
-      m_frame->document()->url().string().latin1().data());
-  return m_frame->document()->url().string().latin1().data();
+  static std::string url;
+  url = m_frame->document()->url().string().latin1().data();
+  NODE_LOGV("%s, URL for the NodeProxy %p, frame %p: %s", __FUNCTION__, this, m_frame, url.c_str());
+  return url.c_str();
 }
 
 class InvokePendingTimer : public TimerBase {
@@ -122,7 +113,6 @@ class InvokePendingTimer : public TimerBase {
 
     virtual void fired() {
       node::Node::InvokePending();
-      node::Node::CheckTestStatus();
       delete this;
     }
 };
@@ -131,10 +121,6 @@ void NodeProxy::HandleNodeEvent(node::NodeEvent *ev) {
   NODE_LOGI("Node Bridge event type: %d", ev->type);
   NODE_ASSERT(isMainThread()); // should be called only on the main thread
   switch (ev->type) {
-    case node::NODE_EVENT_FP_REGISTER_PRIVILEGED_FEATURES:
-      handleRegisterPrivilegedFeaturesEvent(ev);
-      break;
-
     case node::NODE_EVENT_FP_REQUEST_PERMISSION:
       handleRequestPermission(ev);
       break;

@@ -3597,6 +3597,7 @@ std::string WebViewCore::getEnvironmentProperty(const char *type, bool privateTy
       return std::string();
     std::string returnPath(path);
     env->ReleaseStringUTFChars(pathObj, path);
+
     checkException(env);
     return returnPath;
 }

@@ -72,11 +72,11 @@ namespace WebCore {
       virtual void HandleNodeEvent(node::NodeEvent *ev);
       virtual void OnDelete();
       virtual void OnTestDone();
-      virtual std::string url();
+      virtual const char* url();
       virtual node::NodeView* Unwrap(v8::Handle<v8::Object> object);
       virtual v8::Handle<v8::Value> CreatePreviewNode(node::NodeSource *);
       virtual v8::Handle<v8::Value> CreateArrayBuffer(void *buf, int size);
-      virtual std::string GetEnvironmentProperty(const char *prop, bool );
+      virtual const char* GetEnvironmentProperty(const char *prop, bool );
 
       // accessors
       Frame *frame() const { return m_frame; }
