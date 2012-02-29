@@ -56,7 +56,7 @@ public:
 
     virtual bool drawGL();
 
-    void setPicture(SkPicture& picture);
+    void setPicture(SkPicture& picture, IntSize& size);
 
     void setCanvasID(int& id)   {   m_canvas_id = id;   }
     int getCanvasID()   {   return m_canvas_id; }
@@ -97,6 +97,8 @@ private:
 
     //OOM Management
     static std::list<int> s_canvas_oom;
+
+    static std::map<int, IntSize> s_canvas_dimensions;
 };  // class CanvasLayerAndroid
 
 } // namespace WebCore

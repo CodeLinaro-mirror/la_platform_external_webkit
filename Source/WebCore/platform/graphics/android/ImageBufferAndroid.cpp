@@ -132,7 +132,8 @@ void ImageBuffer::copyRecordingToLayer( GraphicsContext* paintContext, const Int
 {
     SkPicture* canvasRecording = context()->platformContext()->getRecordingPicture();
     SkPicture dstPicture(*canvasRecording);
-    canvasLayer->setPicture(dstPicture);
+    IntSize size = r.size();
+    canvasLayer->setPicture(dstPicture, size);
     clearRecording();
 }
 
@@ -141,7 +142,8 @@ void ImageBuffer::resetRecordingToLayer( GraphicsContext* paintContext, const In
 {
     SkPicture* canvasRecording = new SkPicture();
     SkPicture dstPicture(*canvasRecording);
-    canvasLayer->setPicture(dstPicture);
+    IntSize size = r.size();
+    canvasLayer->setPicture(dstPicture, size);
     clearRecording();
 }
 
