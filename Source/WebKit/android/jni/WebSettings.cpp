@@ -142,6 +142,9 @@ struct FieldIds {
         mUseDoubleTree = env->GetFieldID(clazz, "mUseDoubleTree", "Z");
         mPageCacheCapacity = env->GetFieldID(clazz, "mPageCacheCapacity", "I");
         mWOFFEnabled = env->GetFieldID(clazz, "mWOFFEnabled", "Z");
+#if ENABLE(WEBGL)
+        mWebGLEnabled = env->GetFieldID(clazz, "mWebGLEnabled", "Z");
+#endif
 #if ENABLE(WEB_AUTOFILL)
         mAutoFillEnabled = env->GetFieldID(clazz, "mAutoFillEnabled", "Z");
         mAutoFillProfile = env->GetFieldID(clazz, "mAutoFillProfile", "Landroid/webkit/WebSettings$AutoFillProfile;");
@@ -202,6 +205,9 @@ struct FieldIds {
         LOG_ASSERT(mUseDoubleTree, "Could not find field mUseDoubleTree");
         LOG_ASSERT(mPageCacheCapacity, "Could not find field mPageCacheCapacity");
         LOG_ASSERT(mWOFFEnabled, "Could not find field mWOFFEnabled");
+#if ENABLE(WEBGL)
+        LOG_ASSERT(mWebGLEnabled, "Could not find field mWebGLEnabled");
+#endif
 
         jclass enumClass = env->FindClass("java/lang/Enum");
         LOG_ASSERT(enumClass, "Could not find Enum class!");
@@ -252,6 +258,9 @@ struct FieldIds {
     jfieldID mUseDoubleTree;
     jfieldID mPageCacheCapacity;
     jfieldID mWOFFEnabled;
+#if ENABLE(WEBGL)
+    jfieldID mWebGLEnabled;
+#endif
     // Ordinal() method and value field for enums
     jmethodID mOrdinal;
     jfieldID  mTextSizeValue;
@@ -566,6 +575,11 @@ public:
         flag = env->GetBooleanField(obj, gFieldIds->mWOFFEnabled);
         s->setWOFFEnabled(flag);
 
+#if ENABLE(WEBGL)
+        flag = env->GetBooleanField(obj, gFieldIds->mWebGLEnabled);
+        s->setWebGLEnabled(flag);
+#endif
+
 #if ENABLE(WEB_AUTOFILL)
         flag = env->GetBooleanField(obj, gFieldIds->mAutoFillEnabled);
         // TODO: This updates the Settings WebCore side with the user's
@@ -602,10 +616,6 @@ public:
         // dapi: provide the app private data path to node
         str = (jstring)env->GetObjectField(obj, gFieldIds->mDataPath);
         WebCore::INodeProxy::setAppDataPath(jstringToWtfString(env, str));
-#endif
-
-#if ENABLE(WEBGL)
-        s->setWebGLEnabled(false);
 #endif
     }
 };
