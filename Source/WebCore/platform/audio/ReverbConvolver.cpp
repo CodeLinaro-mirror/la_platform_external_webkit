@@ -82,7 +82,7 @@ ReverbConvolver::ReverbConvolver(AudioChannel* impulseResponse, size_t renderSli
     // Otherwise, assume we're being run from a command-line tool.
     bool hasRealtimeConstraint = useBackgroundThreads;
 
-    float* response = impulseResponse->data();
+    const float* response = impulseResponse->data();
     size_t totalResponseLength = impulseResponse->length();
 
     // Because we're not using direct-convolution in the leading portion, the reverb has an overall latency of half the first-stage FFT size
@@ -102,7 +102,7 @@ ReverbConvolver::ReverbConvolver(AudioChannel* impulseResponse, size_t renderSli
         // This "staggers" the time when each FFT happens so they don't all happen at the same time
         int renderPhase = convolverRenderPhase + i * renderSliceSize;
 
-        OwnPtr<ReverbConvolverStage> stage(new ReverbConvolverStage(response, totalResponseLength, reverbTotalLatency, stageOffset, stageSize, fftSize, renderPhase, renderSliceSize, &m_accumulationBuffer));
+        OwnPtr<ReverbConvolverStage> stage = adoptPtr(new ReverbConvolverStage(response, totalResponseLength, reverbTotalLatency, stageOffset, stageSize, fftSize, renderPhase, renderSliceSize, &m_accumulationBuffer));
 
         bool isBackgroundStage = false;
 
@@ -175,15 +175,15 @@ void ReverbConvolver::backgroundThreadEntry()
     }
 }
 
-void ReverbConvolver::process(AudioChannel* sourceChannel, AudioChannel* destinationChannel, size_t framesToProcess)
+void ReverbConvolver::process(const AudioChannel* sourceChannel, AudioChannel* destinationChannel, size_t framesToProcess)
 {
     bool isSafe = sourceChannel && destinationChannel && sourceChannel->length() >= framesToProcess && destinationChannel->length() >= framesToProcess;
     ASSERT(isSafe);
     if (!isSafe)
         return;
         
-    float* source = sourceChannel->data();
-    float* destination = destinationChannel->data();
+    const float* source = sourceChannel->data();
+    float* destination = destinationChannel->mutableData();
     bool isDataSafe = source && destination;
     ASSERT(isDataSafe);
     if (!isDataSafe)
