@@ -46,7 +46,7 @@ static void fixNANs(double &x)
         x = 0.0;
 }
 
-AudioPannerNode::AudioPannerNode(AudioContext* context, double sampleRate)
+AudioPannerNode::AudioPannerNode(AudioContext* context, float sampleRate)
     : AudioNode(context, sampleRate)
     , m_panningModel(Panner::PanningModelHRTF)
     , m_lastGain(-1.0)
@@ -62,7 +62,7 @@ AudioPannerNode::AudioPannerNode(AudioContext* context, double sampleRate)
     m_orientation = FloatPoint3D(1, 0, 0);
     m_velocity = FloatPoint3D(0, 0, 0);
     
-    setType(NodeTypePanner);
+    setNodeType(NodeTypePanner);
 
     initialize();
 }
@@ -152,9 +152,19 @@ AudioListener* AudioPannerNode::listener()
 
 void AudioPannerNode::setPanningModel(unsigned short model)
 {
-    if (!m_panner.get() || model != m_panningModel) {
-        OwnPtr<Panner> newPanner = Panner::create(model, sampleRate());
-        m_panner = newPanner.release();
+    switch (model) {
+    case EQUALPOWER:
+    case HRTF:
+    case SOUNDFIELD:
+        if (!m_panner.get() || model != m_panningModel) {
+            OwnPtr<Panner> newPanner = Panner::create(model, sampleRate());
+            m_panner = newPanner.release();
+            m_panningModel = model;
+        }
+        break;
+    default:
+        // FIXME: consider throwing an exception for illegal model values.
+        break;
     }
 }
 
@@ -188,7 +198,7 @@ void AudioPannerNode::getAzimuthElevation(double* outAzimuth, double* outElevati
 
     FloatPoint3D up = listenerRight.cross(listenerFrontNorm);
 
-    double upProjection = sourceListener.dot(up);
+    float upProjection = sourceListener.dot(up);
 
     FloatPoint3D projectedSource = sourceListener - upProjection * up;
     projectedSource.normalize();
@@ -294,7 +304,7 @@ void AudioPannerNode::notifyAudioSourcesConnectedToNode(AudioNode* node)
         return;
         
     // First check if this node is an AudioBufferSourceNode.  If so, let it know about us so that doppler shift pitch can be taken into account.
-    if (node->type() == NodeTypeAudioBufferSource) {
+    if (node->nodeType() == NodeTypeAudioBufferSource) {
         AudioBufferSourceNode* bufferSourceNode = reinterpret_cast<AudioBufferSourceNode*>(node);
         bufferSourceNode->setPannerNode(this);
     } else {    
