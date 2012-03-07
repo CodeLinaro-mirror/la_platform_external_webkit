@@ -72,6 +72,7 @@ namespace WebCore {
 #endif
 
 namespace WebCore {
+    class AudioDestination;
     class BaseLayerAndroid;
 }
 
@@ -454,6 +455,17 @@ namespace android {
         void dumpRenderTree(bool);
         void dumpNavTree();
 
+#if ENABLE(WEB_AUDIO)
+        /*  We maintain a list of active audio tracks. The list is edited by the
+            AudioDestination. The list is used to pause/resume audio playback
+            when WebViewCore thread is paused/resumed.
+         */
+        void addAudioDestination(WebCore::AudioDestination*);
+        void removeAudioDestination(WebCore::AudioDestination*);
+        void pauseAudioDestinations();
+        void resumeAudioDestinations();
+#endif
+
         /*  We maintain a list of active plugins. The list is edited by the
             pluginview itself. The list is used to service invals to the plugin
             pageflipping bitmap.
@@ -711,6 +723,9 @@ namespace android {
         int m_cacheMode;
         bool m_shouldPaintCaret;
 
+#if ENABLE(WEB_AUDIO)
+        SkTDArray<AudioDestination*> m_audioDestinations;
+#endif
         SkTDArray<PluginWidgetAndroid*> m_plugins;
         WebCore::Timer<WebViewCore> m_pluginInvalTimer;
         void pluginInvalTimerFired(WebCore::Timer<WebViewCore>*) {
