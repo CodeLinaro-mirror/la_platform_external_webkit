@@ -114,6 +114,10 @@ ifneq ($(HTTP_STACK),chrome)
   ENABLE_AUTOFILL = false
 endif
 
+ifneq ($(ENABLE_WEBAUDIO),false)
+  ENABLE_WEBAUDIO = true
+endif
+
 #WEBCORE_ACCELERATED_SCROLLING := true
 
 BASE_PATH := $(call my-dir)
@@ -280,6 +284,17 @@ LOCAL_C_INCLUDES := $(LOCAL_C_INCLUDES) \
 	vendor/qcom/opensource/webkit/BackingStore
 endif
 
+ifeq ($(ENABLE_WEBAUDIO),true)
+LOCAL_C_INCLUDES := $(LOCAL_C_INCLUDES) \
+	external/kissfft \
+	frameworks/base/include/media/stagefright/openmax \
+	$(WEBCORE_PATH)/platform/audio \
+	$(WEBCORE_PATH)/platform/audio/android \
+	$(WEBCORE_PATH)/webaudio \
+	$(WEBKIT_PATH)/android/webaudio \
+	$(WEBKIT_PATH)/android/neon
+endif
+
 # proteus framework
 ifeq ($(PROTEUS_DEVICE_API), true)
 LOCAL_C_INCLUDES := $(LOCAL_C_INCLUDES) \
@@ -378,6 +393,10 @@ ifeq ($(ARCH_ARM_HAVE_VFP),true)
 LOCAL_CFLAGS += -DANDROID_LARGE_MEMORY_DEVICE
 endif
 
+ifeq ($(ARCH_ARM_HAVE_NEON),true)
+LOCAL_CFLAGS += -D__USE_ARM_NEON__
+endif
+
 ifeq ($(ENABLE_SVG),true)
 LOCAL_CFLAGS += -DENABLE_SVG=1 -DENABLE_SVG_ANIMATION=1
 endif
@@ -438,6 +457,10 @@ ifeq ($(WEBCORE_INSTRUMENTATION),true)
 LOCAL_SHARED_LIBRARIES += libhardware_legacy
 endif
 
+ifeq ($(ENABLE_WEBAUDIO),true)
+LOCAL_SHARED_LIBRARIES += libstagefright
+endif
+
 # We have to use the android version of libdl
 LOCAL_SHARED_LIBRARIES += libdl libstlport
 # We have to fake out some headers when using stlport.
@@ -459,6 +482,14 @@ LOCAL_STATIC_LIBRARIES := libxml2 libxslt libhyphenation libskiagpu
 
 ifeq ($(ENABLE_WEBGL),true)
 LOCAL_STATIC_LIBRARIES += libpng
+endif
+
+# WebAudio
+ifeq ($(ENABLE_WEBAUDIO),true)
+    LOCAL_STATIC_LIBRARIES += libkissfft
+    ifeq ($(ARCH_ARM_HAVE_NEON),true)
+        LOCAL_STATIC_LIBRARIES += libvmathneon
+    endif
 endif
 
 # Linkage to v8, node
@@ -597,6 +628,13 @@ include $(WEBKIT_PATH)/android/wds/client/Android.mk
 
 # Build the performance command line tool.
 include $(WEBKIT_PATH)/android/benchmark/Android.mk
+
+ifeq ($(ENABLE_WEBAUDIO),true)
+ifeq ($(ARCH_ARM_HAVE_NEON),true)
+# Build the VectorMath NEON routines
+include $(WEBKIT_PATH)/android/neon/Android.mk
+endif
+endif
 
 # Build the webkit merge tool.
 include $(BASE_PATH)/Tools/android/webkitmerge/Android.mk

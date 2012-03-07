@@ -142,3 +142,10 @@ LOCAL_SRC_FILES += \
         android/WebCoreSupport/FeaturePermissions.cpp
 endif
 
+ifeq ($(ENABLE_WEBAUDIO),true)
+LOCAL_SRC_FILES := $(LOCAL_SRC_FILES) \
+	android/webaudio/InMemoryDataSource.cpp \
+	android/webaudio/WebAudioAssetsAndroid.cpp \
+	android/webaudio/WebAudioDestinationAndroid.cpp \
+	android/webaudio/WebAudioDecoderAndroid.cpp
+endif
