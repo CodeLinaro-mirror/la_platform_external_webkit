@@ -43,9 +43,8 @@
 using namespace WTF;
 
 #ifdef PROTEUS_DEVICE_API
-// Proteus:
-#include "NodeProxy.h"
-#include "node.h"
+#include "INodeProxy.h"
+#include <dapi.h>
 #endif
 
 namespace WebCore {
@@ -129,24 +128,20 @@ v8::Handle<v8::Value> V8Navigator::loadModuleCallback(const v8::Arguments& args)
   }
 
   Navigator* navigator = V8Navigator::toNative(args.Holder());
-  NODE_ASSERT(navigator);
   if (!navigator) {
     return v8::Undefined();
   }
 
   // node is loaded on demand (on the first loadModule) and  it should not
   // impact the webpage load if its not used
-  NodeProxy* nodeProxy = navigator->createNodeProxy();
-  NODE_ASSERT(nodeProxy->node());
-  v8::Handle<v8::Function> loadModule = nodeProxy->node()->GetLoadModule();
-  if (loadModule.IsEmpty() || !loadModule->IsFunction()) {
-    NODE_LOGW("%s, loadModule: GetLoadModule failed", __FUNCTION__);
-    return v8::Undefined();
-  }
+  INodeProxy* inodeProxy = navigator->createINodeProxy();
+  NODE_ASSERT(inodeProxy->inode());
+  v8::Local<v8::Value> args_[] = { args[0], args[1], args[2] };
 
-  v8::Handle<v8::Object> navigatorObject = args.Holder()->ToObject();
-  navigatorObject->Set(v8::String::New("loadModule"), loadModule);
-  return nodeProxy->node()->LoadModule(args);
+  dapi::INodeCore *core;
+  inodeProxy->inode()->queryInterface(dapi::INTERFACE_CORE, (void **)&core);
+  NODE_ASSERT(core);
+  return core->loadModule(args_);
 }
 #endif
 

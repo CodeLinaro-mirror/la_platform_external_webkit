@@ -65,7 +65,7 @@
 #endif
 
 #ifdef PROTEUS_DEVICE_API
-#include <node.h>
+#include <dapi_log.h>
 #endif
 
 #if ENABLE(3D_RENDERING)

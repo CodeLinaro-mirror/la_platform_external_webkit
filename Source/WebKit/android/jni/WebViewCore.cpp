@@ -169,8 +169,7 @@ FILE* gRenderTreeFile = 0;
 #endif
 
 #ifdef PROTEUS_DEVICE_API
-// proteus:
-#include "NodeProxy.h"
+#include "INodeProxy.h"
 #endif
 
 // In some cases, too many invalidations passed to the UI will slow us down.
@@ -302,6 +301,7 @@ struct WebViewCore::JavaGlue {
 #ifdef PROTEUS_DEVICE_API
     jmethodID   m_navigatorPermissionsShowPrompt;
     jmethodID   m_navigatorPermissionsHidePrompt;
+    jmethodID   m_setScreenOrientationLock;
 #endif
     jmethodID   m_getDeviceMotionService;
     jmethodID   m_getDeviceOrientationService;
@@ -440,6 +440,7 @@ WebViewCore::WebViewCore(JNIEnv* env, jobject javaWebViewCore, WebCore::Frame* m
 #ifdef PROTEUS_DEVICE_API
     m_javaGlue->m_navigatorPermissionsShowPrompt = GetJMethod(env, clazz, "navigatorPermissionsShowPrompt", "(Ljava/util/Vector;Ljava/lang/String;)V");
     m_javaGlue->m_navigatorPermissionsHidePrompt = GetJMethod(env, clazz, "navigatorPermissionsHidePrompt", "()V");
+    m_javaGlue->m_setScreenOrientationLock  = GetJMethod(env, clazz, "setScreenOrientationLock", "(Ljava/lang/String;)V");
 #endif
     m_javaGlue->m_getDeviceMotionService = GetJMethod(env, clazz, "getDeviceMotionService", "()Landroid/webkit/DeviceMotionService;");
     m_javaGlue->m_getDeviceOrientationService = GetJMethod(env, clazz, "getDeviceOrientationService", "()Landroid/webkit/DeviceOrientationService;");
@@ -3602,6 +3603,15 @@ std::string WebViewCore::getEnvironmentProperty(const char *type, bool privateTy
     return returnPath;
 }
 
+void WebViewCore::setScreenOrientationLock(const char *orientation)
+{
+    JNIEnv* env = JSC::Bindings::getJNIEnv();
+    jstring jOrientationStr = env->NewStringUTF(orientation);
+    env->CallVoidMethod(m_javaGlue->object(env).get(), m_javaGlue->m_setScreenOrientationLock, jOrientationStr);
+    env->DeleteLocalRef(jOrientationStr);
+    checkException(env);
+}
+
 #endif
 jobject WebViewCore::getDeviceMotionService()
 {
@@ -4632,7 +4642,7 @@ static void Pause(JNIEnv* env, jobject obj)
 #ifdef PROTEUS_DEVICE_API
         // proteus: send pause/resume events to node, this will be used by modules
         // to stop their activity e.g. camera stopping a preview
-        NodeProxy *proxy = frame->domWindow()->navigator()->nodeProxy();
+        INodeProxy *proxy = frame->domWindow()->navigator()->inodeProxy();
         if (proxy) {
           proxy->pause();
         }
@@ -4659,7 +4669,7 @@ static void Resume(JNIEnv* env, jobject obj)
 
 #ifdef PROTEUS_DEVICE_API
         // proteus: send resume to node
-        NodeProxy *proxy = frame->domWindow()->navigator()->nodeProxy();
+        INodeProxy *proxy = frame->domWindow()->navigator()->inodeProxy();
         if (proxy) {
           proxy->resume();
         }

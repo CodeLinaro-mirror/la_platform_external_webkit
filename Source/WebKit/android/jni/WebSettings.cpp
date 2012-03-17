@@ -61,10 +61,9 @@
 #include <wtf/text/CString.h>
 
 #ifdef PROTEUS_DEVICE_API
-// proteus:
-#include "NodeProxy.h"
-
+#include "INodeProxy.h"
 #endif
+
 namespace android {
 
 static const int permissionFlags660 = S_IRUSR | S_IWUSR | S_IRGRP | S_IWGRP;
@@ -597,11 +596,11 @@ public:
         // This is required to enable the XMLTreeViewer when loading an XML document that
         // has no style attached to it. http://trac.webkit.org/changeset/79799
         s->setDeveloperExtrasEnabled(true);
-#ifdef PROTEUS_DEVICE_API
 
-        // proteus: provide the app private data path to node
+#ifdef PROTEUS_DEVICE_API
+        // dapi: provide the app private data path to node
         str = (jstring)env->GetObjectField(obj, gFieldIds->mDataPath);
-        WebCore::NodeProxy::setAppDataPath(jstringToWtfString(env, str));
+        WebCore::INodeProxy::setAppDataPath(jstringToWtfString(env, str));
 #endif
     }
 };

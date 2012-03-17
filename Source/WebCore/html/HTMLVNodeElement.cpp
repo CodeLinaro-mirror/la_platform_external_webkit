@@ -40,18 +40,15 @@
 #include "V8HTMLVNodeElement.h"
 #include "VNodeLayerAndroid.h"
 
-#include <node.h>
-
 namespace WebCore {
 
 using namespace HTMLNames;
-using namespace node;
 
-HTMLVNodeElement::HTMLVNodeElement(const QualifiedName& tagName, Document* doc, node::NodeSource *source)
+HTMLVNodeElement::HTMLVNodeElement(const QualifiedName& tagName, Document* doc, dapi::INodeCameraSource *source)
   : HTMLElement(tagName, doc)
   , m_attached(false)
 {
-  m_source = source;
+  m_view = new INodeClientCameraViewImpl(source);
   m_texture = adoptRef(new VNodeTexture(this));
   NODE_LOGD("VNODE_API: +HTMLVNodeElement (%p)", this, m_texture.get());
 }
@@ -62,12 +59,13 @@ PassRefPtr<HTMLVNodeElement> HTMLVNodeElement::create(const QualifiedName& tagNa
   return 0;
 }
 
-PassRefPtr<HTMLVNodeElement> HTMLVNodeElement::create(const QualifiedName& tagName, Document* document, node::NodeSource *source) {
+PassRefPtr<HTMLVNodeElement> HTMLVNodeElement::create(const QualifiedName& tagName, Document* document, dapi::INodeCameraSource *source) {
   return adoptRef(new HTMLVNodeElement(tagName, document, source));
 }
 
 HTMLVNodeElement::~HTMLVNodeElement() {
   NODE_LOGD("VNODE_API: ~HTMLVNodeElement (%p)", this);
+	delete m_view;
   m_texture->detachVNode();
 }
 
@@ -103,16 +101,16 @@ void HTMLVNodeElement::attach() {
   NODE_LOGD("VNODE_API: attach (%p)", this);
   HTMLElement::attach(); // FIXME: shouldnt it be image element
 
-  if (renderer() && m_source) {
+  if (renderer() && m_view->source()) {
     NODE_LOGD("VNODE_API: Attach (view=%p, source=%p, renderer=%p, surfacetexture=%p)",
-        this, m_source, renderer(), m_texture->surfaceTexture());
+        this, m_view->source(), renderer(), m_texture->surfaceTexture());
     {
       MutexLocker lock(m_texture->lock());
-      m_source->Attach(this, m_texture->surfaceTexture());
+      m_view->source()->attach(m_view, static_cast<void*>(m_texture->surfaceTexture()));
       m_attached = true;
     }
   } else {
-    NODE_LOGW("attach ignored (view=%p, source=%p, renderer=%p)", this, m_source, renderer());
+    NODE_LOGW("attach ignored (view=%p, source=%p, renderer=%p)", this, m_view->source(), renderer());
   }
 }
 
@@ -120,15 +118,15 @@ void HTMLVNodeElement::detach() {
   NODE_LOGD("VNODE_API: detach (%p)", this);
 
   // FIXME: we shouldnt be getting detach calls with no renderer
-  if (renderer() && m_source) {
-    NODE_LOGD("VNODE_API: Detach (view=%p, source=%p)", this, m_source);
+  if (renderer() && m_view->source()) {
+    NODE_LOGD("VNODE_API: Detach (view=%p, source=%p)", this, m_view->source());
     {
       MutexLocker lock(m_texture->lock());
-      m_source->Detach(this);
+      m_view->source()->detach();
       m_attached = false;
     }
   } else {
-    NODE_LOGW("VNODE_API: ignoring detach renderer(%p), source(%p)", renderer(), m_source);
+    NODE_LOGW("VNODE_API: ignoring detach renderer(%p), source(%p)", renderer(), m_view->source());
   }
 
   HTMLElement::detach();
@@ -184,15 +182,6 @@ void HTMLVNodeElement::invalidate() {
     NODE_LOGV("VNODE_API: repaint (vnode:%p renderer:%p)", this, renderer());
     renderer()->repaint();
   }
-}
-
-void HTMLVNodeElement::SetSource(node::NodeSource* source) {
-  // Not required
-}
-
-void HTMLVNodeElement::UpdatePreviewFrame(const char* buf, int bufsize,
-        int width, int height, int orientation) {
-  NODE_NI();
 }
 
 VNodeTexture* HTMLVNodeElement::texture() {

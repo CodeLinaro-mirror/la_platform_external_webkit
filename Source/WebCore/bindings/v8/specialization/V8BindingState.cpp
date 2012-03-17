@@ -39,7 +39,7 @@
 #ifdef PROTEUS_DEVICE_API
 #include "Navigator.h"
 #include "DOMWindow.h"
-#include "NodeProxy.h"
+#include "INodeProxy.h"
 #endif
 
 namespace WebCore {
@@ -63,10 +63,18 @@ DOMWindow* State<V8Binding>::activeWindow()
     // check if the calling context is the node context associated with the current browser context
     // if so, set the active context as the current browser context
     DOMWindow *window = V8Proxy::retrieveWindow(v8::Context::GetCurrent());
-    NodeProxy *proxy = window->navigator()->nodeProxy();
-    if (proxy && proxy->node()->context() == activeContext) {
+    INodeProxy *proxy = window->navigator()->inodeProxy();
+
+    // get handle to node's core interface
+    if (proxy) {
+      dapi::INodeCore *core;
+      proxy->inode()->queryInterface(dapi::INTERFACE_CORE, (void**)&core);
+      NODE_ASSERT(core);
+
+      if (core->inodeContext() == activeContext) {
         NODE_LOGI("%s, calling context is a node context, active context set to current", __FUNCTION__);
         activeContext = v8::Context::GetCurrent();
+      }
     }
 #endif
 

@@ -41,7 +41,9 @@
 #include "VNodeLayerAndroid.h"
 
 #include "GraphicsLayer.h"
-#include <node.h>
+
+// dapi
+#include "dapi_log.h"
 
 namespace WebCore {
 

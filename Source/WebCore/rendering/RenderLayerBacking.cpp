@@ -61,9 +61,6 @@
 
 #ifdef PROTEUS_DEVICE_API
 #include "RenderVNode.h"
-#undef LOG_TAG_NODE
-#define LOG_TAG_NODE "RenderLayerBacking"
-#include <node.h>
 #endif
 
 using namespace std;

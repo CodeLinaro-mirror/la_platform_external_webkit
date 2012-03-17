@@ -33,16 +33,26 @@
 #ifdef PROTEUS_DEVICE_API
 
 #include "HTMLElement.h"
-#include <node.h>
+#include <dapi.h>
 
 namespace WebCore {
 
 class VNodeTexture;
-class HTMLVNodeElement : public HTMLElement, public node::NodeView {
+
+class INodeClientCameraViewImpl : public dapi::INodeClientCameraView {
+  public:
+    INodeClientCameraViewImpl(dapi::INodeCameraSource *source) : m_source(source) {}
+    dapi::INodeCameraSource* source() { return m_source; }
+
+  private:
+    dapi::INodeCameraSource *m_source;
+};
+
+class HTMLVNodeElement : public HTMLElement {
   public:
     static PassRefPtr<HTMLVNodeElement> create(const QualifiedName&, Document*);
-    static PassRefPtr<HTMLVNodeElement> create(const QualifiedName&, Document*, node::NodeSource*);
-    HTMLVNodeElement(const QualifiedName& tagName, Document*, node::NodeSource*);
+    static PassRefPtr<HTMLVNodeElement> create(const QualifiedName&, Document*, dapi::INodeCameraSource*);
+    HTMLVNodeElement(const QualifiedName& tagName, Document*, dapi::INodeCameraSource*);
     virtual ~HTMLVNodeElement();
 
     virtual bool mapToEntry(const QualifiedName&, MappedAttributeEntry&) const;
@@ -58,19 +68,16 @@ class HTMLVNodeElement : public HTMLElement, public node::NodeView {
     unsigned width() const;
     void setWidth(unsigned);
     unsigned height() const;
+
     void setHeight(unsigned);
-
     void invalidate();
-
-    // NodeView interface
-    void SetSource(node::NodeSource* source);
-    void UpdatePreviewFrame(const char* buf, int bufsize,
-        int width, int height, int orientation);
 
     VNodeTexture* texture();
     bool attached() { return m_attached; }
+    INodeClientCameraViewImpl* view() { return m_view; }
 
   private:
+    INodeClientCameraViewImpl *m_view;
     RefPtr<VNodeTexture> m_texture;
     bool m_attached;
 };

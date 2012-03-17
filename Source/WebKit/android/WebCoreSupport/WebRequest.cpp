@@ -394,7 +394,7 @@ void WebRequest::handlePermissionsURL(GURL url)
 
     tmp += "<html> <head> <script type=\"text/javascript\"> ";
 
-    tmp += "var permissionUI = {}; function clearAll() { permissionUI.clearAll(); var tmpTable = document.getElementById('PermissionTable'); for(var i=document.getElementById('PermissionTable').rows.length; i > 0;i--) { var tmpRow = tmpTable.rows[i-1]; if(typeof  tmpRow.cells[2].childNodes[0].id == 'undefined') { continue; } tmpTable.deleteRow(i-1); } } ";
+    tmp += "var permissionUI = {}; function clearAll() { permissionUI.clearAll(); var tmpTable = document.getElementById('PermissionTable'); for(var i=document.getElementById('PermissionTable').rows.length; i > 0;i--) { var tmpRow = tmpTable.rows[i-1]; if(typeof  tmpRow.cells[0].childNodes[0].id == 'undefined') { continue; } tmpTable.deleteRow(i-1); } } ";
 
     tmp += "function load() { navigator.loadModule('permissionUI', function(val) { permissionUI = val; var features = permissionUI.features; document.body.innerHTML = '<h1>Permission Settings</h1>' + '<hr />' + '<h2> Enable/Disable Permissions </h2>' + \"<TABLE id='FeatureTable' width='350px' border='1'>\" + '<tbody>' + '<th> Feature </th>' + '<th> Enabled </th>' + '<tbody>' + '</TABLE>' + '<hr />' + '<h2> Clear Permissions </h2>' + \"<input type='button' value='clear All Permissions' onclick='clearAll()' />\" + \"<TABLE id='PermissionTable' width='350px' border='1'>\" + '<tbody>' + '<th> Feature </th>' + '<th> URL </th>' + '<th> Allowed </th>' + '<th>  </th>' + '<tbody>' + '</TABLE>'; ";
 

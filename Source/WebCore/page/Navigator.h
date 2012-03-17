@@ -45,8 +45,8 @@ class ApplicationInstalledCallback;
 class Connection;
 #endif
 #ifdef PROTEUS_DEVICE_API
-// proteus:
-class NodeProxy;
+// proteus
+class INodeProxy;
 #endif
 
 typedef int ExceptionCode;
@@ -96,10 +96,9 @@ public:
                                     PassRefPtr<NavigatorUserMediaErrorCallback> = 0);
 #endif
 #ifdef PROTEUS_DEVICE_API
-    // proteus:
-    // returns the current node proxy, could be null
-    NodeProxy* nodeProxy() const;
-    NodeProxy* createNodeProxy();
+    // dapi: returns the current inode proxy, could be null
+    INodeProxy* inodeProxy() const;
+    INodeProxy* createINodeProxy();
 #endif
 
 private:
@@ -117,9 +116,8 @@ private:
     String m_applicationNameQuery;
 #endif
 #ifdef PROTEUS_DEVICE_API
-
-    // proteus:
-    mutable RefPtr<NodeProxy> m_nodeProxy;
+    // proteus
+    mutable RefPtr<INodeProxy> m_inodeProxy;
 #endif
 };
 

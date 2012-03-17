@@ -690,7 +690,7 @@ LOCAL_SRC_FILES := $(LOCAL_SRC_FILES) \
 	platform/graphics/android/CanvasLayerShader.cpp \
 	platform/graphics/android/VideoLayerManager.cpp \
 	platform/graphics/android/ZoomManager.cpp \
-	platform/graphics/android/android_graphics.cpp \
+	platform/graphics/android/android_graphics.cpp
 
 ifeq ($(ENABLE_SVG), true)
 LOCAL_SRC_FILES := $(LOCAL_SRC_FILES) \
@@ -1267,7 +1267,10 @@ endif
 # proteus:
 ifeq ($(PROTEUS_DEVICE_API), true)
 LOCAL_SRC_FILES := $(LOCAL_SRC_FILES) \
-        node/NodeProxy.cpp \
+        dapi/INodeProxy.cpp \
+        dapi/INodeClientWebView.cpp \
+        dapi/INodeClientCamera.cpp \
+        dapi/INodeClientPermission.cpp \
         platform/graphics/android/VNodeLayerAndroid.cpp \
         rendering/RenderVNode.cpp
 endif

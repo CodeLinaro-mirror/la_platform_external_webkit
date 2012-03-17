@@ -38,7 +38,7 @@
 #include <gui/SurfaceTexture.h>
 
 #include "HTMLVNodeElement.h"
-#include <node.h>
+#include <dapi_log.h>
 
 #if USE(ACCELERATED_COMPOSITING)
 
@@ -162,11 +162,11 @@ void VNodeTexture::updateTextureOnMainThread(void *data) {
 
   VNodeTexture *texture = static_cast<VNodeTexture*>(data);
   MutexLocker lock(texture->m_lock);
-  NODE_ASSERT(texture->vnode() && texture->vnode()->Source());
-  if (texture->vnode() && texture->vnode()->Source()) {
+  NODE_ASSERT(texture->vnode() && texture->vnode()->view()->source());
+  if (texture->vnode() && texture->vnode()->view()->source()) {
     NODE_LOGD("updateTextureMainThread: vnode(%p), source(%p) texture(%p)", texture->vnode(),
-        texture->vnode()->Source(), texture->m_surfaceTexture.get());
-    texture->vnode()->Source()->SetPreviewTexture((void *)texture->m_surfaceTexture.get());
+        texture->vnode()->view()->source(), texture->m_surfaceTexture.get());
+    texture->vnode()->view()->source()->setPreviewTexture((void *)texture->m_surfaceTexture.get());
   }
   texture->deref();
 }

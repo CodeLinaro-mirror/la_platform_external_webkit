@@ -291,6 +291,11 @@ namespace android {
          */
         std::string getEnvironmentProperty(const char *, bool privateType);
 
+         /**
+        * Locks the orientation of the screen (i.e.- the containing activity)
+        */
+        void setScreenOrientationLock(const char * orientation);
+
 #endif
         jobject getDeviceMotionService();
         jobject getDeviceOrientationService();

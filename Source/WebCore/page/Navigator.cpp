@@ -4,7 +4,6 @@
  *  Copyright (c) 2000 Stefan Schimanski (schimmi@kde.org)
  *  Copyright (C) 2003, 2004, 2005, 2006 Apple Computer, Inc.
  *  Copyright (C) 2008 Nokia Corporation and/or its subsidiary(-ies)
- *  Copyright (c) 2011, Code Aurora Forum. All rights reserved.
  *
  *  This library is free software; you can redistribute it and/or
  *  modify it under the terms of the GNU Lesser General Public
@@ -54,7 +53,7 @@
 
 #ifdef PROTEUS_DEVICE_API
 // proteus:
-#include "NodeProxy.h"
+#include "INodeProxy.h"
 
 #endif
 namespace WebCore {
@@ -91,9 +90,9 @@ void Navigator::disconnectFrame()
     }
 #ifdef PROTEUS_DEVICE_API
     // proteus:
-    if (m_nodeProxy) {
-        m_nodeProxy->disconnectFrame();
-        m_nodeProxy = 0;
+    if (m_inodeProxy) {
+        m_inodeProxy->disconnectFrame();
+        m_inodeProxy = 0;
     }
 #endif
     m_frame = 0;
@@ -307,15 +306,15 @@ void Navigator::webkitGetUserMedia(const String& options,
 
 #ifdef PROTEUS_DEVICE_API
 // proteus:
-NodeProxy* Navigator::createNodeProxy() {
+INodeProxy* Navigator::createINodeProxy() {
   // should be created once per navigator/page
-  ASSERT(!m_nodeProxy.get());
-  m_nodeProxy = NodeProxy::create(m_frame);
-  return m_nodeProxy.get();
+  ASSERT(!m_inodeProxy.get());
+  m_inodeProxy = INodeProxy::create(m_frame);
+  return m_inodeProxy.get();
 }
 
-NodeProxy* Navigator::nodeProxy() const {
-  return m_nodeProxy.get();
+INodeProxy* Navigator::inodeProxy() const {
+  return m_inodeProxy.get();
 }
 
 #endif

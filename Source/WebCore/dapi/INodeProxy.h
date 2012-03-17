@@ -34,23 +34,34 @@
 #include <wtf/PassRefPtr.h>
 #include <wtf/RefCounted.h>
 
-#include "Frame.h"
-#include <node.h>
-#include <v8.h>
+#include <dapi.h>
+#include <map>
+
+namespace WTF {
+  class String;
+}
 
 namespace WebCore {
-  // NodeProxy is the webcore side object for a node instance
-  // its a 1-1 mapping to node instance in that page (one per context/frame)
-  // Its owned by the DOMWindow and gets destroyed when the DOMWindow is detached
-  // from frame (atleast currently)
-  class NodeProxy: public RefCounted<NodeProxy>, public node::NodeClient {
+
+  class Frame;
+  class INodeClientCameraImpl;
+  class INodeClientWebViewImpl;
+  class INodeClientPermissionImpl;
+
+  /**
+   * INodeProxy is the webcore side object for a node instance
+   * its a 1-1 mapping to node instance in that page (one per context/frame)
+   * Its owned by the DOMWindow and gets destroyed when the DOMWindow is detached
+   * from frame
+   */
+  class INodeProxy: public RefCounted<INodeProxy>, public dapi::INodeClient {
     public:
-      static PassRefPtr<NodeProxy> create(Frame *frame){
-        return adoptRef(new NodeProxy(frame));
+      static PassRefPtr<INodeProxy> create(Frame *frame){
+        return adoptRef(new INodeProxy(frame));
       }
 
       // releases node resources
-      ~NodeProxy();
+      ~INodeProxy();
 
       // handle app focus in/out events
       void pause();
@@ -60,40 +71,46 @@ namespace WebCore {
       // we release node resources here
       void disconnectFrame();
 
-      // this the app data path that will be used as the root 
+      // this the app data path that will be used as the root
       // for installing and looking up node modules
-      static void setAppDataPath(const String&);
+      static void setAppDataPath(const WTF::String&);
 
       // handles request from node ev thread, will schedule
       // the request on the webcore thread
       static void HandleInvokePending();
 
-      // NodeClient interface
-      virtual void HandleNodeEvent(node::NodeEvent *ev);
-      virtual void OnDelete();
-      virtual void OnTestDone();
-      virtual const char* url();
-      virtual node::NodeView* Unwrap(v8::Handle<v8::Object> object);
-      virtual v8::Handle<v8::Value> CreatePreviewNode(node::NodeSource *);
-      virtual v8::Handle<v8::Value> CreateArrayBuffer(void *buf, int size);
-      virtual const char* GetEnvironmentProperty(const char *prop, bool );
+      /**
+       * This is the core bridge api that exposes services from the webkit to node
+       * @interface interface that is being queried
+       * @object object that implements the interface, null if no object implements
+       * @return true if there is object that implements the interface, false otherwise
+       */
+      bool queryInterface(dapi::Interface, void** object);
+
+      /**
+       * Register implementation for a interface. This is useful to
+       * register objects already available that implement the interface.
+       * @interface interface this object implements
+       * @imp object implementing the interface
+       */
+      void registerInterface(dapi::Interface interface, void* object);
 
       // accessors
       Frame *frame() const { return m_frame; }
-      node::Node *node() const { return m_node; }
+      dapi::INode *inode() const { return m_inode; }
 
     private:
-      void handleNodeEventEvThread(node::NodeEvent* e);
-
-      // This needs to be static since javashared client expects a C pointer
-      static void handleNodeEventMainThread(void* data);
-      void handleRegisterPrivilegedFeaturesEvent(node::NodeEvent *ev);
-      void handleCameraPreviewFrameEvent(node::NodeEvent *ev);
-      void handleRequestPermission(node::NodeEvent *ev);
-      NodeProxy(Frame*);
+      INodeProxy(Frame*);
       Frame *m_frame;
-      node::Node *m_node;
-      static String* s_moduleRootPath;
+      dapi::INode *m_inode;
+
+      INodeClientCameraImpl *m_cameraImpl;
+      INodeClientPermissionImpl *m_permissionImpl;
+      INodeClientWebViewImpl *m_webviewImpl;
+
+      std::map<dapi::Interface, void*> m_interfaceMap;
+
+      static WTF::String* s_moduleRootPath;
       static bool s_nodeInitialized;
   };
 }
