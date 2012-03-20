@@ -114,6 +114,8 @@ public:
 
     void initSharedSurfaceTextures(int width, int height);
 
+    SkBitmap* getQueueBitmap();
+
     // insert the bitmap into the queue, mark the tile dirty if failing
     void updateQueueWithBitmap(const TileRenderInfo* renderInfo, int x, int y,
                                const SkBitmap& bitmap);

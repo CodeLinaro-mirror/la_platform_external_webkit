@@ -50,7 +50,7 @@
 
 #endif // DEBUG
 
-#define ST_BUFFER_NUMBER 6
+#define ST_BUFFER_NUMBER 7
 
 // Set this to 1 if we would like to take the new GpuUpload approach which
 // relied on the glCopyTexSubImage2D instead of a glDraw call
@@ -455,7 +455,17 @@ void TransferQueue::addItemInTransferQueue(const TileRenderInfo* renderInfo,
             int h = bitmap->height();
             m_transferQueue[index].bitmap->setConfig(bitmap->config(), w, h);
         }
-        bitmap->copyTo(m_transferQueue[index].bitmap, bitmap->config());
+        bool copy = true;
+        bitmap->lockPixels();
+        m_transferQueue[index].bitmap->lockPixels();
+        void* srcPtr = bitmap->getPixels();
+        void* desPtr = m_transferQueue[index].bitmap->getPixels();
+        if (srcPtr == desPtr)
+            copy = false;
+        bitmap->unlockPixels();
+        m_transferQueue[index].bitmap->unlockPixels();
+        if (copy)
+            bitmap->copyTo(m_transferQueue[index].bitmap, bitmap->config());
     }
 
     // Now fill the tileInfo.
@@ -469,6 +479,36 @@ void TransferQueue::addItemInTransferQueue(const TileRenderInfo* renderInfo,
     textureInfo->m_picture = renderInfo->textureInfo->m_pictureCount;
 
     m_emptyItemCount--;
+}
+
+SkBitmap* TransferQueue::getQueueBitmap()
+{
+    android::Mutex::Autolock lock(m_transferQueueItemLocks);
+    bool ready = readyForUpdate();
+    if (!ready) {
+        XLOG("Quit bitmap update: not ready! for tile");
+        return 0;
+    }
+    if (m_currentUploadType == GpuUpload) {
+        return 0;
+    }
+
+    int index = (m_transferQueueIndex + 1) % ST_BUFFER_NUMBER;
+
+    if (m_transferQueue[index].savedBaseTilePtr
+        || m_transferQueue[index].status != emptyItem) {
+        XLOG("ERROR update a tile which is dirty already @ index %d", index);
+    }
+
+    if (!m_transferQueue[index].bitmap) {
+        m_transferQueue[index].bitmap = new SkBitmap();
+        int w = TilesManager::instance()->tileWidth();
+        int h = TilesManager::instance()->tileHeight();
+        m_transferQueue[index].bitmap->setConfig(SkBitmap::kARGB_8888_Config, w, h);
+        m_transferQueue[index].bitmap->allocPixels();
+    }
+
+    return m_transferQueue[index].bitmap;
 }
 
 void TransferQueue::setTextureUploadType(TextureUploadType type)
