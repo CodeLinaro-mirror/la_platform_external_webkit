@@ -105,10 +105,10 @@ namespace WebCore {
       Frame *m_frame;
       dapi::INode *m_inode;
 
-      INodeClientAudioImpl *m_audioImpl;
-      INodeClientCameraImpl *m_cameraImpl;
-      INodeClientPermissionImpl *m_permissionImpl;
-      INodeClientWebViewImpl *m_webviewImpl;
+      OwnPtr<INodeClientAudioImpl> m_audioImpl;
+      OwnPtr<INodeClientCameraImpl> m_cameraImpl;
+      OwnPtr<INodeClientPermissionImpl> m_permissionImpl;
+      OwnPtr<INodeClientWebViewImpl> m_webviewImpl;
 
       std::map<dapi::Interface, void*> m_interfaceMap;
 

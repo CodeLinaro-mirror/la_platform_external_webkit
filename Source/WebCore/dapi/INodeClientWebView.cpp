@@ -65,8 +65,10 @@ const char* INodeClientWebViewImpl::url() {
 
 void INodeClientWebViewImpl::setScreenOrientationLock(const char *orientation) {
   NODE_LOGV("%s, type: %s", __FUNCTION__, orientation);
-  android::WebViewCore* webViewCore = android::WebViewCore::getWebViewCore(m_proxy->frame()->view());
-  webViewCore->setScreenOrientationLock(orientation);
+  if(m_proxy->frame()->view()) {
+    android::WebViewCore* webViewCore = android::WebViewCore::getWebViewCore(m_proxy->frame()->view());
+    webViewCore->setScreenOrientationLock(orientation);
+  }
 }
 
 }
