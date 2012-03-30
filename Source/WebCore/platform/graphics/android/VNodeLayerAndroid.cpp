@@ -162,7 +162,13 @@ void VNodeTexture::updateTextureOnMainThread(void *data) {
 
   VNodeTexture *texture = static_cast<VNodeTexture*>(data);
   MutexLocker lock(texture->m_lock);
-  NODE_ASSERT(texture->vnode() && texture->vnode()->view()->source());
+  // BUGFIX
+  // we dont make a blocking call to updateTextureOnMainThread, so by the time
+  // we are invoked, the vnode could have been detached (run camera-multiple-preview
+  // with a timer less than 250ms), so this assert doesnt hold
+  // FIXME - we need to investigate a blocking callOnMainThreadAndWait to avoid this
+  // condition (but that api had issues working reliably. e.g. it could deadlock)
+  // NODE_ASSERT(texture->vnode() && texture->vnode()->view()->source());
   if (texture->vnode() && texture->vnode()->view()->source()) {
     NODE_LOGD("updateTextureMainThread: vnode(%p), source(%p) texture(%p)", texture->vnode(),
         texture->vnode()->view()->source(), texture->m_surfaceTexture.get());

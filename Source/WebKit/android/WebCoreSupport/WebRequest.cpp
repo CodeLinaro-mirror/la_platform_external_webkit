@@ -392,9 +392,11 @@ void WebRequest::handlePermissionsURL(GURL url)
     OwnPtr<std::string> data(new std::string);
     std::string tmp = std::string("<!DOCTYPE html PUBLIC \"-//W3C//DTD HTML 4.01 Transitional//EB\">");
 
-    tmp += "<html> <head> <script type=\"text/javascript\"> ";
+    tmp += "<html> <head> ";
+    tmp += "<meta name='viewport' content='width=device-width, initial-scale=1.0'/> ";
+    tmp += "<script type=\"text/javascript\"> ";
 
-    tmp += "var permissionUI = {}; function clearAll() { permissionUI.clearAll(); var tmpTable = document.getElementById('PermissionTable'); for(var i=document.getElementById('PermissionTable').rows.length; i > 0;i--) { var tmpRow = tmpTable.rows[i-1]; if(typeof  tmpRow.cells[0].childNodes[0].id == 'undefined') { continue; } tmpTable.deleteRow(i-1); } } ";
+    tmp += "var permissionUI = {}; function clearAll() { permissionUI.clearAll(); var tmpTable = document.getElementById('PermissionTable'); console.log('Got table');for(var i=document.getElementById('PermissionTable').rows.length; i > 0;i--) { var tmpRow = tmpTable.rows[i-1]; if(typeof  tmpRow.cells[2].childNodes[0].id == 'undefined') { console.log('row undefined');continue; } tmpTable.deleteRow(i-1); console.log('deleting row ' + i-1);} } ";
 
     tmp += "function load() { navigator.loadModule('permissionUI', function(val) { permissionUI = val; var features = permissionUI.features; document.body.innerHTML = '<h1>Permission Settings</h1>' + '<hr />' + '<h2> Enable/Disable Permissions </h2>' + \"<TABLE id='FeatureTable' width='350px' border='1'>\" + '<tbody>' + '<th> Feature </th>' + '<th> Enabled </th>' + '<tbody>' + '</TABLE>' + '<hr />' + '<h2> Clear Permissions </h2>' + \"<input type='button' value='clear All Permissions' onclick='clearAll()' />\" + \"<TABLE id='PermissionTable' width='350px' border='1'>\" + '<tbody>' + '<th> Feature </th>' + '<th> URL </th>' + '<th> Allowed </th>' + '<th>  </th>' + '<tbody>' + '</TABLE>'; ";
 
