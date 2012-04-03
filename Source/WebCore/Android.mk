@@ -1271,3 +1271,25 @@ LOCAL_SRC_FILES := $(LOCAL_SRC_FILES) \
         platform/graphics/android/VNodeLayerAndroid.cpp \
         rendering/RenderVNode.cpp
 endif
+
+ifeq ($(call is-chipset-prefix-in-board-platform,msm7627),true)
+  LOCAL_CFLAGS += -DVIDEO_PLATFORM_ID=2
+else
+  ifeq ($(call is-chipset-in-board-platform,msm7630),true)
+    LOCAL_CFLAGS += -DVIDEO_PLATFORM_ID=3
+  else
+    ifeq ($(call is-board-platform,msm8660),true)
+      LOCAL_CFLAGS += -DVIDEO_PLATFORM_ID=4
+    else
+      ifeq ($(call is-board-platform,msm8960),true)
+        LOCAL_CFLAGS += -DVIDEO_PLATFORM_ID=5
+      else
+        ifeq ($(call is-board-platform,copper),true)
+          LOCAL_CFLAGS += -DVIDEO_PLATFORM_ID=6
+        else
+          LOCAL_CFLAGS += -DVIDEO_PLATFORM_ID=1
+        endif
+      endif
+    endif
+  endif
+endif
