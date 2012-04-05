@@ -43,6 +43,7 @@ class INodeClientCameraViewImpl : public dapi::INodeClientCameraView {
   public:
     INodeClientCameraViewImpl(dapi::INodeCameraSource *source) : m_source(source) {}
     dapi::INodeCameraSource* source() { return m_source; }
+    void detach() { m_source = 0; }
 
   private:
     dapi::INodeCameraSource *m_source;

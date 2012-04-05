@@ -1270,6 +1270,7 @@ LOCAL_SRC_FILES := $(LOCAL_SRC_FILES) \
         dapi/INodeProxy.cpp \
         dapi/INodeClientWebView.cpp \
         dapi/INodeClientCamera.cpp \
+        dapi/INodeClientAudio.cpp \
         dapi/INodeClientPermission.cpp \
         platform/graphics/android/VNodeLayerAndroid.cpp \
         rendering/RenderVNode.cpp

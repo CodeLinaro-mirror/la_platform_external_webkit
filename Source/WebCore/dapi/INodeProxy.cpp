@@ -32,6 +32,7 @@
 #include "Frame.h"
 #include "text/CString.h"
 #include "INodeProxy.h"
+#include "INodeClientAudio.h"
 #include "INodeClientCamera.h"
 #include "INodeClientPermission.h"
 #include "INodeClientWebView.h"
@@ -57,6 +58,7 @@ INodeProxy::INodeProxy(Frame* frame)
   }
 
   // Create all the client objects
+  m_audioImpl = new INodeClientAudioImpl(this);
   m_cameraImpl = new INodeClientCameraImpl(this);
   m_permissionImpl = new INodeClientPermissionImpl(this);
   m_webviewImpl = new INodeClientWebViewImpl(this);

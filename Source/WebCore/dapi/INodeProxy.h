@@ -44,6 +44,7 @@ namespace WTF {
 namespace WebCore {
 
   class Frame;
+  class INodeClientAudioImpl;
   class INodeClientCameraImpl;
   class INodeClientWebViewImpl;
   class INodeClientPermissionImpl;
@@ -104,6 +105,7 @@ namespace WebCore {
       Frame *m_frame;
       dapi::INode *m_inode;
 
+      INodeClientAudioImpl *m_audioImpl;
       INodeClientCameraImpl *m_cameraImpl;
       INodeClientPermissionImpl *m_permissionImpl;
       INodeClientWebViewImpl *m_webviewImpl;

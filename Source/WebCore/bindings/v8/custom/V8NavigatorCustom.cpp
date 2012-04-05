@@ -134,7 +134,13 @@ v8::Handle<v8::Value> V8Navigator::loadModuleCallback(const v8::Arguments& args)
 
   // node is loaded on demand (on the first loadModule) and  it should not
   // impact the webpage load if its not used
-  INodeProxy* inodeProxy = navigator->createINodeProxy();
+
+  // BUGFIX: crash with multiple loadModules (fs, camera) in same page
+  // A webpage (frame) can have a single node proxy/node instance attached to it
+  // If there's already a proxy, use it, otherwise create it
+  INodeProxy* inodeProxy = navigator->inodeProxy() ?
+    navigator->inodeProxy() : navigator->createINodeProxy();
+
   NODE_ASSERT(inodeProxy->inode());
   v8::Local<v8::Value> args_[] = { args[0], args[1], args[2] };
 
