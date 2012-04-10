@@ -315,10 +315,11 @@ void ImageBuffer::putUnmultipliedImageData(ByteArray* source, const IntSize& sou
     for (int y = 0; y < numRows; ++y) {
         for (int x = 0; x < numColumns; x++) {
             int basex = x * 4;
-            dstRows[x] = SkPackARGB32(srcRows[basex + 3],
-                                      srcRows[basex + 0],
-                                      srcRows[basex + 1],
-                                      srcRows[basex + 2]);
+            unsigned char alpha = srcRows[basex + 3];
+            dstRows[x] = SkPackARGB32(alpha,
+                                      SkMulDiv255Ceiling(srcRows[basex + 0], alpha),
+                                      SkMulDiv255Ceiling(srcRows[basex + 1], alpha),
+                                      SkMulDiv255Ceiling(srcRows[basex + 2], alpha));
         }
         dstRows += dstPixelsPerRow;
         srcRows += srcBytesPerRow;
