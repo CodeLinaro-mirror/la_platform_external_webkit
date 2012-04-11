@@ -46,6 +46,8 @@ namespace WebCore {
 
         AtomicString m_namespaceURI;
         AtomicString m_localName;
+        bool m_isStarAtomNamespaceURI : 1;
+        bool m_isStarAtomlocalName : 1;
     };
 
 } // namespace WebCore

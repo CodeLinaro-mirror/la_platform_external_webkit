@@ -5,6 +5,7 @@
  * Copyright (C) 2004, 2005, 2006, 2007, 2008, 2009, 2010 Apple Inc. All rights reserved.
  * Copyright (C) 2008 Nokia Corporation and/or its subsidiary(-ies)
  * Copyright (C) 2009 Torch Mobile Inc. All rights reserved. (http://www.torchmobile.com/)
+ * Copyright (C) 2012 Code Aurora Forum. All rights reserved.
  *
  * This library is free software; you can redistribute it and/or
  * modify it under the terms of the GNU Library General Public
@@ -409,6 +410,8 @@ Node::~Node()
         m_previous->setNextSibling(0);
     if (m_next)
         m_next->setPreviousSibling(0);
+    m_nextNode = 0;
+    m_previousNode = 0;
 
     if (m_document)
         m_document->guardDeref();
@@ -517,9 +520,12 @@ void Node::setTreeScopeRecursively(TreeScope* newTreeScope)
     if (currentDocument && currentDocument != newDocument)
         currentDocument->incDOMTreeVersion();
 
-    for (Node* node = this; node; node = node->traverseNextNode(this)) {
+    Node* last = this->lastDescendantNode(true);
+    for (Node* node = this; node; node = node->traverseNextNodeFastPath()) {
         node->setTreeScope(newTreeScope);
         // FIXME: Once shadow scopes are landed, update parent scope, etc.
+        if (last == node)
+            break;
     }
 }
 
@@ -560,6 +566,10 @@ void Node::setShadowHost(Element* host)
         clearFlag(IsShadowRootFlag);
 
     setParent(host);
+    updatePreviousNode();
+    lastDescendantNode(true)->updateNextNode();
+    if (host)
+        host->updateNextNode();
 }
 
 InputElement* Node::toInputElement()
@@ -862,12 +872,15 @@ void Node::setDocumentRecursively(Document* newDocument)
 {
     ASSERT(document() != newDocument);
 
-    for (Node* node = this; node; node = node->traverseNextNode(this)) {
+    Node* last = this->lastDescendantNode(true);
+    for (Node* node = this; node; node = node->traverseNextNodeFastPath()) {
         node->setDocument(newDocument);
-        if (!node->isElementNode())
-            continue;
-        if (Node* shadow = shadowRoot(node))
-            shadow->setDocumentRecursively(newDocument);
+        if (node->isElementNode()) {
+            if (Node* shadow = shadowRoot(node))
+                shadow->setDocumentRecursively(newDocument);
+        }
+        if (node == last)
+            break;
     }
 }
 
@@ -911,12 +924,15 @@ void Node::setNeedsStyleRecalc(StyleChangeType changeType)
 
 void Node::lazyAttach(ShouldSetAttached shouldSetAttached)
 {
-    for (Node* n = this; n; n = n->traverseNextNode(this)) {
+    Node* last = this->lastDescendantNode(true);
+    for (Node* n = this; n; n = n->traverseNextNodeFastPath()) {
         if (n->firstChild())
             n->setChildNeedsStyleRecalc();
         n->setStyleChange(FullStyleChange);
         if (shouldSetAttached == SetAttached)
             n->setAttached();
+        if (n == last)
+            break;
     }
     markAncestorsWithChildNeedsStyleRecalc();
 }
@@ -1115,18 +1131,55 @@ void Node::removeCachedLabelsNodeList(DynamicNodeList* list)
 
 Node* Node::traverseNextNode(const Node* stayWithin) const
 {
-    if (firstChild())
-        return firstChild();
+    Node* fc = firstChild();
+    if (fc)
+        return fc;
     if (this == stayWithin)
         return 0;
-    if (nextSibling())
-        return nextSibling();
+    Node* ns = nextSibling();
+    if (ns)
+        return ns;
     const Node *n = this;
     while (n && !n->nextSibling() && (!stayWithin || n->parentNode() != stayWithin))
         n = n->parentNode();
     if (n)
         return n->nextSibling();
     return 0;
+}
+
+Node* Node::lastDescendantNode(bool includeThis) const
+{
+    Node* n = lastChild();
+    if (!n && includeThis)
+        return const_cast<Node*>(this);
+
+    Node* p = n;
+    while(n) {
+        p = n;
+        n = n->lastChild();
+    }
+    return p;
+}
+
+void Node::updatePrevNextNodesInSubtree()
+{
+    Node* n = firstChild();
+    Node* next;
+    while(n) {
+        next = n->traverseNextNode(this);
+        if (next) {
+            n->setNextNode(next);
+            next->setPreviousNode(n);
+        } else {
+            next = n->traverseNextNode();
+            n->setNextNode(next);
+            if (next)
+                next->setPreviousNode(n);
+            break;
+        }
+        n = next;
+    }
+    updateNextNode();
 }
 
 Node* Node::traverseNextSibling(const Node* stayWithin) const
@@ -1157,10 +1210,11 @@ Node* Node::traversePreviousNode(const Node* stayWithin) const
 {
     if (this == stayWithin)
         return 0;
-    if (previousSibling()) {
-        Node *n = previousSibling();
-        while (n->lastChild())
-            n = n->lastChild();
+    Node *n = previousSibling();
+    if (n) {
+        Node* lastChild;
+        while ((lastChild = n->lastChild()))
+            n = lastChild;
         return n;
     }
     return parentNode();
@@ -1794,7 +1848,8 @@ PassRefPtr<Element> Node::querySelector(const String& selectors, ExceptionCode& 
     }
 
     // FIXME: We can speed this up by implementing caching similar to the one use by getElementById
-    for (Node* n = firstChild(); n; n = n->traverseNextNode(this)) {
+    Node* last = lastDescendantNode();
+    for (Node* n = firstChild(); n; n = n->traverseNextNodeFastPath()) {
         if (n->isElementNode()) {
             Element* element = static_cast<Element*>(n);
             for (CSSSelector* selector = querySelectorList.first(); selector; selector = CSSSelectorList::next(selector)) {
@@ -1802,6 +1857,8 @@ PassRefPtr<Element> Node::querySelector(const String& selectors, ExceptionCode& 
                     return element;
             }
         }
+        if (n == last)
+            break;
     }
     
     return 0;
