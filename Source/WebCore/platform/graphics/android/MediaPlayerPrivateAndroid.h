@@ -90,11 +90,13 @@ public:
     virtual void paint(GraphicsContext*, const IntRect&) { }
 
     virtual void updateSizeAndDuration(int duration, int width, int height) { }
+    virtual void onPrepared(int duration, int width, int height) { }
     void onEnded();
     void onPaused();
     virtual void onPosterFetched(SkBitmap*) { }
     void onBuffering(int percent);
     void onTimeupdate(int position);
+    virtual bool mediaPreloadEnabled() { return false; }
 
     // These following two functions are used to turn on inline video support
     bool supportsAcceleratedRendering() const { return true; }
@@ -127,6 +129,8 @@ protected:
 
     SkBitmap* m_poster; // not owned
     String m_posterUrl;
+
+    bool m_isMediaLoaded;
 
     IntSize m_naturalSize;
     bool m_naturalSizeUnknown;

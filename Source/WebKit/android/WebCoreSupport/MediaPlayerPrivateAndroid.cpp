@@ -34,6 +34,7 @@
 #include "FrameLoader.h"
 #include "FrameView.h"
 #include "GraphicsContext.h"
+#include "Settings.h"
 #include "SkiaUtils.h"
 #include "TilesManager.h"
 #include "VideoLayerAndroid.h"
@@ -70,6 +71,8 @@ struct MediaPlayerPrivate::JavaGlue {
     // Video
     jmethodID m_getInstance;
     jmethodID m_loadPoster;
+    jmethodID m_loadVideo;
+    jmethodID m_loadMetadata;
 };
 
 MediaPlayerPrivate::~MediaPlayerPrivate()
@@ -161,10 +164,12 @@ void MediaPlayerPrivate::prepareToPlay()
     // state in here. This will allow the MediaPlayer to transition to
     // the "play" state, at which point our VideoView will start downloading
     // the content and start the playback.
-    m_networkState = MediaPlayer::Loaded;
-    m_player->networkStateChanged();
-    m_readyState = MediaPlayer::HaveEnoughData;
-    m_player->readyStateChanged();
+    if (!mediaPreloadEnabled() || m_player->preload() != MediaPlayer::Auto) {
+        m_networkState = MediaPlayer::Loaded;
+        m_player->networkStateChanged();
+        m_readyState = MediaPlayer::HaveEnoughData;
+        m_player->readyStateChanged();
+    }
 }
 
 MediaPlayerPrivate::MediaPlayerPrivate(MediaPlayer* player)
@@ -176,6 +181,7 @@ MediaPlayerPrivate::MediaPlayerPrivate(MediaPlayer* player)
     m_readyState(MediaPlayer::HaveNothing),
     m_networkState(MediaPlayer::Empty),
     m_poster(0),
+    m_isMediaLoaded(false),
     m_naturalSize(100, 100),
     m_naturalSizeUnknown(true),
     m_durationUnknown(true),
@@ -264,27 +270,32 @@ public:
         checkException(env);
     }
 
+    void onPrepared(int duration, int width, int height)
+    {
+        m_networkState = MediaPlayer::Loaded;
+        m_player->networkStateChanged();
+        m_readyState = MediaPlayer::HaveEnoughData;
+        m_player->readyStateChanged();
+    }
+
     void updateSizeAndDuration(int duration, int width, int height)
     {
-        if (duration > 0 && m_durationUnknown) {
+        if (duration > 0) {
             m_duration = duration / 1000.0f;
             m_durationUnknown = false;
-            m_player->durationChanged();
-        } else if (m_durationUnknown) {
+        } else {
             // If the duration is unknown, Android Media Player returns 0,
             // The duration should be set to positive infinity
             // according to the HTML5 video spec in this case
             m_duration = std::numeric_limits<float>::infinity();
-            m_player->durationChanged();
         }
+        m_player->durationChanged();
 
-        if (width != 0 && height != 0 && m_naturalSizeUnknown) {
-            m_naturalSize = IntSize(width, height);
-            m_naturalSizeUnknown = false;
-            m_player->sizeChanged();
-            TilesManager::instance()->videoLayerManager()->updateVideoLayerSize(
-                m_player->platformLayer()->uniqueId(), width*height);
-        }
+        m_naturalSize = IntSize(width, height);
+        m_naturalSizeUnknown = false;
+        m_player->sizeChanged();
+        TilesManager::instance()->videoLayerManager()->updateVideoLayerSize(
+            m_player->platformLayer()->uniqueId(), width*height);
     }
 
     bool canLoadPoster() const { return true; }
@@ -342,6 +353,15 @@ public:
         }
     }
 
+    bool mediaPreloadEnabled()
+    {
+        if (m_player && m_player->mediaPlayerClient()
+            && m_player->mediaPlayerClient()->mediaPlayerOwningDocument()
+            && m_player->mediaPlayerClient()->mediaPlayerOwningDocument()->settings())
+            return m_player->mediaPlayerClient()->mediaPlayerOwningDocument()->settings()->mediaPreloadEnabled();
+        return false;
+    }
+
     virtual bool hasAudio() const { return false; } // do not display the audio UI
     virtual bool hasVideo() const { return true; }
     virtual bool supportsFullscreen() const { return true; }
@@ -367,6 +387,8 @@ public:
         m_glue->m_pause = env->GetMethodID(clazz, "pause", "()V");
         m_glue->m_setVolume = env->GetMethodID(clazz, "setVolume", "(F)V");
         m_glue->m_javaProxy = 0;
+        m_glue->m_loadVideo = env->GetMethodID(clazz, "loadVideo", "(Ljava/lang/String;I)V");
+        m_glue->m_loadMetadata = env->GetMethodID(clazz, "loadMetadata", "(Ljava/lang/String;I)V");
         env->DeleteLocalRef(clazz);
         // An exception is raised if any of the above fails.
         checkException(env);
@@ -375,8 +397,10 @@ public:
     void createJavaPlayerIfNeeded()
     {
         // Check if we have been already created.
-        if (m_glue->m_javaProxy)
+        if (m_glue->m_javaProxy) {
+            loadVideoIfNeeded();
             return;
+        }
 
         JNIEnv* env = JSC::Bindings::getJNIEnv();
         if (!env)
@@ -408,10 +432,37 @@ public:
         if (jUrl)
             env->DeleteLocalRef(jUrl);
 
+        loadVideoIfNeeded();
+
         // Clean up.
         env->DeleteLocalRef(obj);
         env->DeleteLocalRef(clazz);
         checkException(env);
+    }
+
+    void loadVideoIfNeeded()
+    {
+        if (m_player->preload() == MediaPlayer::None
+            || !mediaPreloadEnabled()
+            || m_isMediaLoaded)
+            return;
+
+        JNIEnv* env = JSC::Bindings::getJNIEnv();
+        if (!env)
+            return;
+
+        if (m_url.length()) {
+            jstring jUrl = wtfStringToJstring(env, m_url);
+            if (m_player->preload() == MediaPlayer::MetaData)
+                env->CallVoidMethod(m_glue->m_javaProxy, m_glue->m_loadMetadata, jUrl,
+                        m_videoLayer->uniqueId());
+            else
+                env->CallVoidMethod(m_glue->m_javaProxy, m_glue->m_loadVideo, jUrl,
+                        m_videoLayer->uniqueId());
+            m_isMediaLoaded = true;
+            env->DeleteLocalRef(jUrl);
+            checkException(env);
+        }
     }
 
     float maxTimeSeekable() const
@@ -537,7 +588,7 @@ public:
         checkException(env);
     }
 
-    void updateSizeAndDuration(int duration, int width, int height)
+    void onPrepared(int duration, int width, int height)
     {
         // Android media player gives us a duration of 0 for a live
         // stream, so in that case set the real duration to infinity.
@@ -570,7 +621,7 @@ static void OnPrepared(JNIEnv* env, jobject obj, int duration, int width, int he
 {
     if (pointer) {
         WebCore::MediaPlayerPrivate* player = reinterpret_cast<WebCore::MediaPlayerPrivate*>(pointer);
-        player->updateSizeAndDuration(duration, width, height);
+        player->onPrepared(duration, width, height);
     }
 }
 
