@@ -131,6 +131,8 @@ namespace WebCore {
 
 using namespace HTMLNames;
 
+const int Node::cPrefetchTargetDepth = 7;
+
 bool Node::isSupported(const String& feature, const String& version)
 {
     return DOMImplementation::hasFeature(feature, version);
@@ -1131,6 +1133,7 @@ void Node::removeCachedLabelsNodeList(DynamicNodeList* list)
 
 Node* Node::traverseNextNode(const Node* stayWithin) const
 {
+    prefetchTarget();
     Node* fc = firstChild();
     if (fc)
         return fc;
@@ -1186,11 +1189,15 @@ Node* Node::traverseNextSibling(const Node* stayWithin) const
 {
     if (this == stayWithin)
         return 0;
-    if (nextSibling())
-        return nextSibling();
+    prefetchTarget();
+    Node* ns = nextSibling();
+    if (ns)
+        return ns;
     const Node *n = this;
-    while (n && !n->nextSibling() && (!stayWithin || n->parentNode() != stayWithin))
+    while (n && !n->nextSibling() && (!stayWithin || n->parentNode() != stayWithin)) {
+        n->prefetchTarget();
         n = n->parentNode();
+    }
     if (n)
         return n->nextSibling();
     return 0;
