@@ -36,6 +36,18 @@ class SkBitmap;
 
 namespace WebCore {
 
+class VideoLayerObserver : public VideoLayerObserverInterface {
+public:
+    VideoLayerObserver();
+
+    void notifyRectChange(const FloatRect&);
+    ~VideoLayerObserver() { }
+
+    const FloatRect& getScreenRect() const { return m_screenRect; }
+private:
+    FloatRect m_screenRect;
+};
+
 class MediaPlayerPrivate : public MediaPlayerPrivateInterface {
 public:
     virtual ~MediaPlayerPrivate();
@@ -107,6 +119,10 @@ public:
     }
     void onStopFullscreen();
 
+    virtual void prepareEnterFullscreen() { }
+    virtual void prepareExitFullscreen() { }
+    VideoLayerObserver* getVideoLayerObserver() { return m_videoLayerObserver; }
+
 protected:
     // Android-specific methods and fields.
     static MediaPlayerPrivateInterface* create(MediaPlayer* player);
@@ -140,6 +156,8 @@ protected:
 
     bool m_isVisible;
     VideoLayerAndroid* m_videoLayer;
+
+    VideoLayerObserver* m_videoLayerObserver;
 };
 
 } // namespace WebCore

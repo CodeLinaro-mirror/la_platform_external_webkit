@@ -57,6 +57,19 @@ namespace WebCore {
 static const char* g_ProxyJavaClass = "android/webkit/HTML5VideoViewProxy";
 static const char* g_ProxyJavaClassAudio = "android/webkit/HTML5Audio";
 
+extern android::Mutex videoLayerObserverLock;
+
+VideoLayerObserver::VideoLayerObserver()
+    : m_screenRect(0.0f, 0.0f, -1.0f, -1.0f) // FloatRect(x, y, width, height)
+                                             // (0, 0, -1, -1) represents screen rect unknown
+{
+}
+
+void VideoLayerObserver::notifyRectChange(const FloatRect& screenRect)
+{
+    m_screenRect = screenRect;
+}
+
 struct MediaPlayerPrivate::JavaGlue {
     jobject   m_javaProxy;
     jmethodID m_play;
@@ -73,6 +86,8 @@ struct MediaPlayerPrivate::JavaGlue {
     jmethodID m_loadPoster;
     jmethodID m_loadVideo;
     jmethodID m_loadMetadata;
+    jmethodID m_enterFullscreen;
+    jmethodID m_exitFullscreen;
 };
 
 MediaPlayerPrivate::~MediaPlayerPrivate()
@@ -80,6 +95,11 @@ MediaPlayerPrivate::~MediaPlayerPrivate()
     TilesManager::instance()->videoLayerManager()->removeLayer(m_videoLayer->uniqueId());
     // m_videoLayer is reference counted, unref is enough here.
     m_videoLayer->unref();
+
+    videoLayerObserverLock.lock();
+    m_videoLayerObserver->unref();
+    videoLayerObserverLock.unlock();
+
     if (m_glue->m_javaProxy) {
         JNIEnv* env = JSC::Bindings::getJNIEnv();
         if (env) {
@@ -186,7 +206,8 @@ MediaPlayerPrivate::MediaPlayerPrivate(MediaPlayer* player)
     m_naturalSizeUnknown(true),
     m_durationUnknown(true),
     m_isVisible(false),
-    m_videoLayer(new VideoLayerAndroid())
+    m_videoLayer(new VideoLayerAndroid()),
+    m_videoLayerObserver(new VideoLayerObserver())
 {
 }
 
@@ -409,6 +430,8 @@ public:
         m_glue->m_javaProxy = 0;
         m_glue->m_loadVideo = env->GetMethodID(clazz, "loadVideo", "(Ljava/lang/String;I)V");
         m_glue->m_loadMetadata = env->GetMethodID(clazz, "loadMetadata", "(Ljava/lang/String;I)V");
+        m_glue->m_enterFullscreen = env->GetMethodID(clazz, "enterFullscreen", "(Ljava/lang/String;IFFFF)V");
+        m_glue->m_exitFullscreen = env->GetMethodID(clazz, "exitFullscreen", "(FFFF)V");
         env->DeleteLocalRef(clazz);
         // An exception is raised if any of the above fails.
         checkException(env);
@@ -488,6 +511,38 @@ public:
     float maxTimeSeekable() const
     {
         return m_duration;
+    }
+
+    void prepareEnterFullscreen()
+    {
+        JNIEnv* env = JSC::Bindings::getJNIEnv();
+        if (!env || !m_url.length() || !m_glue->m_javaProxy)
+            return;
+
+        FloatRect screenRect = m_videoLayerObserver->getScreenRect();
+
+        jstring jUrl = wtfStringToJstring(env, m_url);
+        env->CallVoidMethod(m_glue->m_javaProxy, m_glue->m_enterFullscreen, jUrl,
+                            m_videoLayer->uniqueId(), screenRect.x(), screenRect.y(),
+                            screenRect.width(), screenRect.height());
+        env->DeleteLocalRef(jUrl);
+
+        checkException(env);
+    }
+
+    void prepareExitFullscreen()
+    {
+        JNIEnv* env = JSC::Bindings::getJNIEnv();
+        if (!env || !m_glue->m_javaProxy)
+            return;
+
+        FloatRect screenRect = m_videoLayerObserver->getScreenRect();
+
+        env->CallVoidMethod(m_glue->m_javaProxy, m_glue->m_exitFullscreen,
+                            screenRect.x(), screenRect.y(),
+                            screenRect.width(), screenRect.height());
+
+        checkException(env);
     }
 };
 
@@ -717,7 +772,7 @@ static void OnTimeupdate(JNIEnv* env, jobject obj, int position, int pointer)
 // Return value: true when the video layer is found.
 static bool SendSurfaceTexture(JNIEnv* env, jobject obj, jobject surfTex,
                                int baseLayer, int videoLayerId,
-                               int textureName, int playerState) {
+                               int textureName, int playerState, int pointer) {
     if (!surfTex)
         return false;
 
@@ -741,6 +796,13 @@ static bool SendSurfaceTexture(JNIEnv* env, jobject obj, jobject surfTex,
 
     // Set the SurfaceTexture to the layer we found
     videoLayer->setSurfaceTexture(texture, textureName, static_cast<PlayerState>(playerState));
+
+    if (pointer) {
+        WebCore::MediaPlayerPrivate* player =
+            reinterpret_cast<WebCore::MediaPlayerPrivate*>(pointer);
+        videoLayer->registerVideoLayerObserver(player->getVideoLayerObserver());
+    }
+
     return true;
 }
 
@@ -750,6 +812,24 @@ static void OnStopFullscreen(JNIEnv* env, jobject obj, int pointer)
         WebCore::MediaPlayerPrivate* player =
             reinterpret_cast<WebCore::MediaPlayerPrivate*>(pointer);
         player->onStopFullscreen();
+    }
+}
+
+static void PrepareEnterFullscreen(JNIEnv* env, jobject obj, int pointer)
+{
+    if (pointer) {
+        WebCore::MediaPlayerPrivate* player =
+            reinterpret_cast<WebCore::MediaPlayerPrivate*>(pointer);
+        player->prepareEnterFullscreen();
+    }
+}
+
+static void PrepareExitFullscreen(JNIEnv* env, jobject obj, int pointer)
+{
+    if (pointer) {
+        WebCore::MediaPlayerPrivate* player =
+            reinterpret_cast<WebCore::MediaPlayerPrivate*>(pointer);
+        player->prepareExitFullscreen();
     }
 }
 
@@ -771,10 +851,14 @@ static JNINativeMethod g_MediaPlayerMethods[] = {
         (void*) OnPlaying },
     { "nativeOnPosterFetched", "(Landroid/graphics/Bitmap;I)V",
         (void*) OnPosterFetched },
-    { "nativeSendSurfaceTexture", "(Landroid/graphics/SurfaceTexture;IIII)Z",
+    { "nativeSendSurfaceTexture", "(Landroid/graphics/SurfaceTexture;IIIII)Z",
         (void*) SendSurfaceTexture },
     { "nativeOnTimeupdate", "(II)V",
         (void*) OnTimeupdate },
+    { "nativePrepareEnterFullscreen", "(I)V",
+        (void*) PrepareEnterFullscreen },
+    { "nativePrepareExitFullscreen", "(I)V",
+        (void*) PrepareExitFullscreen }
 };
 
 static JNINativeMethod g_MediaAudioPlayerMethods[] = {

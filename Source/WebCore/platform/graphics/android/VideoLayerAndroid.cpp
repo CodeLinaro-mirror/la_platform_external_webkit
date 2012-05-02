@@ -60,6 +60,8 @@ double VideoLayerAndroid::m_rotateDegree = 0;
 
 const IntRect VideoLayerAndroid::buttonRect(0, 0, IMAGESIZE, IMAGESIZE);
 
+android::Mutex videoLayerObserverLock;
+
 VideoLayerAndroid::VideoLayerAndroid()
     : LayerAndroid((RenderLayer*)0)
 {
@@ -77,6 +79,13 @@ void VideoLayerAndroid::init()
     // m_surfaceTexture is only useful on UI thread, no need to copy.
     // And it will be set at setBaseLayer timeframe
     m_playerState = INITIALIZED;
+    m_observer = NULL;
+}
+
+VideoLayerAndroid::~VideoLayerAndroid()
+{
+    android::Mutex::Autolock lock(videoLayerObserverLock);
+    SkSafeUnref(m_observer);
 }
 
 // We can use this function to set the Layer to point to surface texture.
@@ -86,6 +95,13 @@ void VideoLayerAndroid::setSurfaceTexture(sp<SurfaceTexture> texture,
     m_surfaceTexture = texture;
     m_playerState = playerState;
     TilesManager::instance()->videoLayerManager()->registerTexture(uniqueId(), textureName);
+}
+
+void VideoLayerAndroid::registerVideoLayerObserver(VideoLayerObserverInterface* observer)
+{
+    android::Mutex::Autolock lock(videoLayerObserverLock);
+    if (m_observer != observer)
+        SkRefCnt_SafeAssign(m_observer, observer);
 }
 
 GLuint VideoLayerAndroid::createSpinnerInnerTexture()
@@ -243,6 +259,11 @@ bool VideoLayerAndroid::drawGL()
                                                                   1, true);
             }
         }
+    }
+
+    if (m_observer) {
+        IntSize size(rect.width(), rect.height());
+        m_observer->notifyRectChange(TilesManager::instance()->shader()->rectInScreenCoord(m_drawTransform, size));
     }
 
     return drawChildrenGL();

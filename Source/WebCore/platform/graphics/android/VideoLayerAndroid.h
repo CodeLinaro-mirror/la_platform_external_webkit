@@ -46,11 +46,19 @@ namespace WebCore {
 // Please keep them in sync when changed here.
 typedef enum {INITIALIZED, PREPARING, PREPARED, PLAYING, BUFFERING, RELEASED } PlayerState;
 
+class VideoLayerObserverInterface : public SkRefCnt {
+public:
+    virtual ~VideoLayerObserverInterface() { }
+    virtual void notifyRectChange(const FloatRect&) = 0;
+};
+
 class VideoLayerAndroid : public LayerAndroid {
 
 public:
     VideoLayerAndroid();
     explicit VideoLayerAndroid(const VideoLayerAndroid& layer);
+
+    virtual ~VideoLayerAndroid();
 
     virtual bool isVideo() const { return true; }
     virtual LayerAndroid* copy() const { return new VideoLayerAndroid(*this); }
@@ -58,6 +66,7 @@ public:
     // The following 3 functions are called in UI thread only.
     virtual bool drawGL();
     void setSurfaceTexture(sp<SurfaceTexture> texture, int textureName, PlayerState playerState);
+    void registerVideoLayerObserver(VideoLayerObserverInterface* observer);
     GLuint createBackgroundTexture();
     GLuint createSpinnerOuterTexture();
     GLuint createSpinnerInnerTexture();
@@ -85,6 +94,8 @@ private:
     static const int ROTATESTEP = 12;
     static const int IMAGESIZE = 64;
     static const IntRect buttonRect;
+
+    VideoLayerObserverInterface* m_observer;
 };
 
 } // namespace WebCore
