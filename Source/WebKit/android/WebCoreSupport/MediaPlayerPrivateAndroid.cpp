@@ -211,7 +211,11 @@ void MediaPlayerPrivate::onPaused()
 {
     m_paused = true;
     m_player->playbackStateChanged();
-    m_networkState = MediaPlayer::Idle;
+}
+
+void MediaPlayerPrivate::onPlaying()
+{
+    m_paused = false;
     m_player->playbackStateChanged();
 }
 
@@ -296,6 +300,10 @@ public:
         m_player->sizeChanged();
         TilesManager::instance()->videoLayerManager()->updateVideoLayerSize(
             m_player->platformLayer()->uniqueId(), width*height);
+
+        // This is needed to update the ready and network states in the case
+        // where video goes to fullscreen before it starts playing
+        m_player->prepareToPlay();
     }
 
     bool canLoadPoster() const { return true; }
@@ -649,6 +657,14 @@ static void OnPaused(JNIEnv* env, jobject obj, int pointer)
     }
 }
 
+static void OnPlaying(JNIEnv* env, jobject obj, int pointer)
+{
+    if (pointer) {
+        WebCore::MediaPlayerPrivate* player = reinterpret_cast<WebCore::MediaPlayerPrivate*>(pointer);
+        player->onPlaying();
+    }
+}
+
 static void OnPosterFetched(JNIEnv* env, jobject obj, jobject poster, int pointer)
 {
     if (!pointer || !poster)
@@ -739,6 +755,8 @@ static JNINativeMethod g_MediaPlayerMethods[] = {
         (void*) OnStopFullscreen },
     { "nativeOnPaused", "(I)V",
         (void*) OnPaused },
+    { "nativeOnPlaying", "(I)V",
+        (void*) OnPlaying },
     { "nativeOnPosterFetched", "(Landroid/graphics/Bitmap;I)V",
         (void*) OnPosterFetched },
     { "nativeSendSurfaceTexture", "(Landroid/graphics/SurfaceTexture;IIII)Z",
