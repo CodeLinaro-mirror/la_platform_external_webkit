@@ -1,5 +1,6 @@
 /*
  * Copyright 2011 The Android Open Source Project
+ * Copyright (c) 2012, Code Aurora Forum. All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions
@@ -71,7 +72,8 @@ GLfloat* VideoLayerManager::getMatrix(const int layerId)
 {
     android::Mutex::Autolock lock(m_videoLayerInfoMapLock);
     GLfloat* result = 0;
-    if (m_videoLayerInfoMap.contains(layerId))
+    VideoLayerInfo* pInfo = m_videoLayerInfoMap.get(layerId);
+    if (pInfo && pInfo->matrixInitialized)
         result = m_videoLayerInfoMap.get(layerId)->surfaceMatrix;
     return result;
 }
@@ -91,25 +93,44 @@ void VideoLayerManager::registerTexture(const int layerId, const GLuint textureI
 {
     android::Mutex::Autolock lock(m_videoLayerInfoMapLock);
     // If the texture has been registered, then early return.
-    if (m_videoLayerInfoMap.get(layerId)) {
-        GLuint oldTextureId = m_videoLayerInfoMap.get(layerId)->textureId;
-        if (oldTextureId != textureId)
-            removeLayerInternal(layerId);
-        else
-            return;
-    }
+    VideoLayerInfo* pPreviousInfo = m_videoLayerInfoMap.get(layerId);
+
+    if (pPreviousInfo && pPreviousInfo->textureId == textureId)
+        return;
+
     // The old info is deleted and now complete the new info and store it.
     VideoLayerInfo* pInfo = new VideoLayerInfo();
     pInfo->textureId = textureId;
-    memset(pInfo->surfaceMatrix, 0, sizeof(pInfo->surfaceMatrix));
+    if (pPreviousInfo == NULL) {
+        memset(pInfo->surfaceMatrix, 0, sizeof(pInfo->surfaceMatrix));
+        pInfo->matrixInitialized = false;
+    } else {
+        // Need the previous surface matrix to composite the new texture
+        memcpy(pInfo->surfaceMatrix, pPreviousInfo->surfaceMatrix, sizeof(pInfo->surfaceMatrix));
+        pInfo->matrixInitialized = true;
+        // Can now delete the previous entry
+        removeLayerInternal(layerId);
+    }
     pInfo->videoSize = 0;
     m_currentTimeStamp++;
     pInfo->timeStamp = m_currentTimeStamp;
+    pInfo->canBeRecycled = false;
 
     m_videoLayerInfoMap.add(layerId, pInfo);
-    XLOG("GL texture %d regisered for layerId %d", textureId, layerId);
+    XLOG("GL texture %d registered for layerId %d", textureId, layerId);
 
     return;
+}
+
+// When a texture is marked for recycling, the client is indicating that there are no
+// longer any external references to the texture and it may be recycled if needed.
+void VideoLayerManager::markTextureForRecycling(const int layerId, const GLuint textureId)
+{
+    android::Mutex::Autolock lock(m_videoLayerInfoMapLock);
+    if (m_videoLayerInfoMap.contains(layerId)) {
+        m_videoLayerInfoMap.get(layerId)->canBeRecycled = true;
+        XLOG("Marked texture %d for recycling", textureId);
+    }
 }
 
 // Only when the video is prepared, we got the video size. So we should update
@@ -145,6 +166,7 @@ void VideoLayerManager::updateMatrix(const int layerId, const GLfloat* matrix)
         if (pInfo && !memcmp(matrix, pInfo->surfaceMatrix, sizeof(pInfo->surfaceMatrix)))
             return;
         memcpy(pInfo->surfaceMatrix, matrix, sizeof(pInfo->surfaceMatrix));
+        pInfo->matrixInitialized = true;
     } else {
         XLOG("Error: should not reach here, the layerId %d should exist!", layerId);
         ASSERT(false);
@@ -166,11 +188,11 @@ bool VideoLayerManager::recycleTextureMem()
 #ifdef DEBUG
     XLOG("VideoLayerManager::recycleTextureMem m_videoLayerInfoMap contains");
     for (InfoIterator it = m_videoLayerInfoMap.begin(); it != end; ++it)
-        XLOG("  layerId %d, textureId %d, videoSize %d, timeStamp %d ",
-             it->first, it->second->textureId, it->second->videoSize, it->second->timeStamp);
+        XLOG("  layerId %d, textureId %d, videoSize %d, timeStamp %d canBeRecycled %d ",
+             it->first, it->second->textureId, it->second->videoSize, it->second->timeStamp, it->second->canBeRecycled);
 #endif
     for (InfoIterator it = m_videoLayerInfoMap.begin(); it != end; ++it) {
-        if (it->second->timeStamp < oldestTimeStamp) {
+        if (it->second->canBeRecycled && it->second->timeStamp < oldestTimeStamp) {
             oldestTimeStamp = it->second->timeStamp;
             oldestLayerId = it->first;
         }
