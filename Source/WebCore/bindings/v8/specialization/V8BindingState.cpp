@@ -58,26 +58,6 @@ DOMWindow* State<V8Binding>::activeWindow()
         // be the activeContext.
         activeContext = v8::Context::GetCurrent();
     }
-
-#ifdef PROTEUS_DEVICE_API
-    // check if the calling context is the node context associated with the current browser context
-    // if so, set the active context as the current browser context
-    DOMWindow *window = V8Proxy::retrieveWindow(v8::Context::GetCurrent());
-    INodeProxy *proxy = window->navigator()->inodeProxy();
-
-    // get handle to node's core interface
-    if (proxy) {
-      dapi::INodeCore *core;
-      proxy->inode()->queryInterface(dapi::INTERFACE_CORE, (void**)&core);
-      NODE_ASSERT(core);
-
-      if (core->inodeContext() == activeContext) {
-        NODE_LOGI("%s, calling context is a node context, active context set to current", __FUNCTION__);
-        activeContext = v8::Context::GetCurrent();
-      }
-    }
-#endif
-
     return V8Proxy::retrieveWindow(activeContext);
 }
 

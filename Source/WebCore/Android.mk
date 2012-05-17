@@ -1307,7 +1307,8 @@ LOCAL_SRC_FILES := $(LOCAL_SRC_FILES) \
         dapi/INodeClientAudio.cpp \
         dapi/INodeClientPermission.cpp \
         platform/graphics/android/VNodeLayerAndroid.cpp \
-        rendering/RenderVNode.cpp
+        rendering/RenderVNode.cpp \
+        dapi/INodeClientJavaBridge.cpp
 endif
 
 ifeq ($(call is-chipset-prefix-in-board-platform,msm7627),true)

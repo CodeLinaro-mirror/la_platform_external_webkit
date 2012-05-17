@@ -164,6 +164,7 @@ namespace android {
 #ifdef PROTEUS_DEVICE_API
         virtual void handleRequestPermission(Frame*, Vector<String>&, void*, void (*callback)(void*, bool));
         virtual void handleRequestPermissionResponse(const Vector<String>&, const String&, bool, bool);
+        virtual void resumeFeaturePermission(bool);
 #endif
         virtual void runOpenPanel(Frame*, PassRefPtr<FileChooser>);
         virtual void setCursor(const Cursor&);

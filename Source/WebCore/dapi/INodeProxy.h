@@ -48,6 +48,7 @@ namespace WebCore {
   class INodeClientCameraImpl;
   class INodeClientWebViewImpl;
   class INodeClientPermissionImpl;
+  class INodeClientJavaBridgeImpl;
 
   /**
    * INodeProxy is the webcore side object for a node instance
@@ -109,6 +110,7 @@ namespace WebCore {
       OwnPtr<INodeClientCameraImpl> m_cameraImpl;
       OwnPtr<INodeClientPermissionImpl> m_permissionImpl;
       OwnPtr<INodeClientWebViewImpl> m_webviewImpl;
+      OwnPtr<INodeClientJavaBridgeImpl> m_javaBridgeImpl;
 
       std::map<dapi::Interface, void*> m_interfaceMap;
 

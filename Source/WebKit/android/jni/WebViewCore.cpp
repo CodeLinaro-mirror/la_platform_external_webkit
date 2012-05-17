@@ -4636,7 +4636,9 @@ static void Pause(JNIEnv* env, jobject obj)
     ChromeClient* chromeClient = GET_NATIVE_VIEW(env, obj)->mainFrame()->page()->chrome()->client();
     ChromeClientAndroid* chromeClientAndroid = static_cast<ChromeClientAndroid*>(chromeClient);
     chromeClientAndroid->storeGeolocationPermissions();
-
+#ifdef PROTEUS_DEVICE_API
+    chromeClientAndroid->resumeFeaturePermission(false);
+#endif
     Frame* mainFrame = GET_NATIVE_VIEW(env, obj)->mainFrame();
     for (Frame* frame = mainFrame; frame; frame = frame->tree()->traverseNext()) {
         Geolocation* geolocation = frame->domWindow()->navigator()->optionalGeolocation();
@@ -4671,6 +4673,11 @@ static void Pause(JNIEnv* env, jobject obj)
 static void Resume(JNIEnv* env, jobject obj)
 {
     Frame* mainFrame = GET_NATIVE_VIEW(env, obj)->mainFrame();
+#ifdef PROTEUS_DEVICE_API
+    ChromeClient* chromeClient = mainFrame->page()->chrome()->client();
+    ChromeClientAndroid* chromeClientAndroid = static_cast<ChromeClientAndroid*>(chromeClient);
+    chromeClientAndroid->resumeFeaturePermission(true);
+#endif
     for (Frame* frame = mainFrame; frame; frame = frame->tree()->traverseNext()) {
         Geolocation* geolocation = frame->domWindow()->navigator()->optionalGeolocation();
         if (geolocation)

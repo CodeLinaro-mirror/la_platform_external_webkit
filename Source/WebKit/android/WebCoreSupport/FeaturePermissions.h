@@ -50,6 +50,7 @@ namespace android {
             void handleRequestPermission(WebCore::Frame*, Vector<String>&, void*, void (*)(void*, bool));
             void handleRequestPermissionResponse(const Vector<String>&, String, bool, bool);
             void resetTemporaryPermissionStates();
+            void resumeFeaturePermission(bool state);
 
         private:
             bool areListsEqual(const Vector<String>&, const Vector<String>&) const;

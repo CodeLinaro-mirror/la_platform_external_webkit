@@ -33,6 +33,8 @@
 #include "WebViewCore.h"
 #include "android/log.h"
 
+#define LOGTAG "Permissions"
+
 namespace android {
 
 FeaturePermissions::FeaturePermissions(WebViewCore* webViewCore, Frame* mainFrame)
@@ -103,7 +105,20 @@ void FeaturePermissions::maybeCallbackFrames(String& appid, Vector<void(*)(void*
 
 void FeaturePermissions::resetTemporaryPermissionStates()
 {
+    m_queuedPermissionRequests.clear();
     m_webViewCore->navigatorPermissionsHidePrompt();
+}
+
+void FeaturePermissions::resumeFeaturePermission(bool state)
+{
+    if(!m_queuedPermissionRequests.isEmpty()) {
+        if(state) {
+            m_webViewCore->navigatorPermissionsShowPrompt( m_queuedPermissionRequests[0].features,
+                                                   m_queuedPermissionRequests[0].appid);
+        } else {
+            m_webViewCore->navigatorPermissionsHidePrompt();
+        }
+    }
 }
 
 bool FeaturePermissions::areListsEqual(const Vector<String>& list1, const Vector<String>& list2) const

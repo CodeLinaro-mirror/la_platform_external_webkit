@@ -36,6 +36,7 @@
 #include "INodeClientCamera.h"
 #include "INodeClientPermission.h"
 #include "INodeClientWebView.h"
+#include "INodeClientJavaBridge.h"
 
 namespace WebCore {
 using namespace v8;
@@ -62,6 +63,7 @@ INodeProxy::INodeProxy(Frame* frame)
   m_cameraImpl = new INodeClientCameraImpl(this);
   m_permissionImpl = new INodeClientPermissionImpl(this);
   m_webviewImpl = new INodeClientWebViewImpl(this);
+  m_javaBridgeImpl = new INodeClientJavaBridgeImpl(this);
 
   // load the node instance
   m_inode = new INode(this);

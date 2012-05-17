@@ -544,8 +544,10 @@ void ChromeClientAndroid::onMainFrameLoadStarted()
 #ifdef PROTEUS_DEVICE_API
     if(m_featurePermissions.get())
         m_featurePermissions->resetTemporaryPermissionStates();
+#endif
 }
 
+#ifdef PROTEUS_DEVICE_API
 void ChromeClientAndroid::handleRequestPermission(Frame* frame, Vector<String>& featureList, void* context, void (*callback)(void*, bool))
 {
     if(! m_featurePermissions)
@@ -556,10 +558,16 @@ void ChromeClientAndroid::handleRequestPermission(Frame* frame, Vector<String>& 
 
 void ChromeClientAndroid::handleRequestPermissionResponse(const Vector<String>& featureList, const String& appid, bool allow, bool remember)
 {
-    ASSERT(m_featurePermissions);
-    m_featurePermissions->handleRequestPermissionResponse(featureList, appid, allow, remember);
-#endif
+    if(m_featurePermissions && m_featurePermissions.get())
+        m_featurePermissions->handleRequestPermissionResponse(featureList, appid, allow, remember);
 }
+
+void ChromeClientAndroid::resumeFeaturePermission(bool state)
+{
+    if(m_featurePermissions && m_featurePermissions.get())
+        m_featurePermissions->resumeFeaturePermission(state);
+}
+#endif
 
 void ChromeClientAndroid::runOpenPanel(Frame* frame,
         PassRefPtr<FileChooser> chooser)

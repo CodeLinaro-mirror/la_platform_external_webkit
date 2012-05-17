@@ -50,6 +50,11 @@
 #include <wtf/text/CString.h>
 #include <wtf/text/StringConcatenate.h>
 
+#ifdef PROTEUS_DEVICE_API
+#include "Navigator.h"
+#include "INodeProxy.h"
+#endif
+
 using namespace std;
 
 namespace WebCore {
@@ -263,6 +268,10 @@ bool PageCache::canCachePageContainingThisFrame(Frame* frame)
         && !frame->loader()->subframeLoader()->containsPlugins()
         && !frame->document()->url().protocolIs("https")
         && (!frame->domWindow() || !frame->domWindow()->hasEventListeners(eventNames().unloadEvent))
+#ifdef PROTEUS_DEVICE_API
+        // Do not cache pages that have proteus modules loaded
+        && (!frame->domWindow()->navigator()->inodeProxy())
+#endif
 #if ENABLE(DATABASE)
         && !frame->document()->hasOpenDatabases()
 #endif
