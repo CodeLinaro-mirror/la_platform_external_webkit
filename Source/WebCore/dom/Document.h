@@ -8,6 +8,7 @@
  * Copyright (C) 2010 Nokia Corporation and/or its subsidiary(-ies)
  * Copyright (C) 2011, 2012 Sony Ericsson Mobile Communications AB
  * Copyright (C) 2012 Sony Mobile Communcations AB
+ * Copyright (c) 2011, 2012 Code Aurora Forum. All rights reserved
  *
  * This library is free software; you can redistribute it and/or
  * modify it under the terms of the GNU Library General Public
@@ -1111,6 +1112,12 @@ public:
 
     ContentSecurityPolicy* contentSecurityPolicy() { return m_contentSecurityPolicy.get(); }
 
+    int getNumExternalJs() const { return m_externalJs; }
+    void incrementNumExternalJs() { m_externalJs++; }
+
+    bool doObjectPrefetch() const { return m_doObjPrfth; }
+    bool doJsCssPrefetch() const { return m_doJsCssPrfth; }
+
 protected:
     Document(Frame*, const KURL&, bool isXHTML, bool isHTML);
 
@@ -1412,6 +1419,10 @@ private:
     RefPtr<MediaQueryMatcher> m_mediaQueryMatcher;
     bool m_writeRecursionIsTooDeep;
     unsigned m_writeRecursionDepth;
+
+    int m_externalJs;
+    bool m_doObjPrfth;
+    bool m_doJsCssPrfth;
 
 #if ENABLE(REQUEST_ANIMATION_FRAME)
     OwnPtr<ScriptedAnimationController> m_scriptedAnimationController;
