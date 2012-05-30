@@ -6936,8 +6936,9 @@ float CSSStyleSelector::getComputedSizeFromSpecifiedSize(Document* document, Ren
     float zoomFactor = 1.0f;
     if (!useSVGZoomRules) {
         zoomFactor = style->effectiveZoom();
-        if (Frame* frame = document->frame())
-            zoomFactor *= frame->textZoomFactor();
+        if (!isAbsoluteSize)
+            if (Frame* frame = document->frame())
+                zoomFactor *= frame->textZoomFactor();
     }
 
     // We support two types of minimum font size.  The first is a hard override that applies to
