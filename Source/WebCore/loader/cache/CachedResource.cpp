@@ -4,7 +4,7 @@
     Copyright (C) 2002 Waldo Bastian (bastian@kde.org)
     Copyright (C) 2006 Samuel Weinig (sam.weinig@gmail.com)
     Copyright (C) 2004, 2005, 2006, 2007, 2008 Apple Inc. All rights reserved.
-    Copyright (c) 2011, Code Aurora Forum. All rights reserved
+    Copyright (c) 2011, 2012 Code Aurora Forum. All rights reserved
 
     This library is free software; you can redistribute it and/or
     modify it under the terms of the GNU Library General Public
@@ -182,7 +182,11 @@ void CachedResource::finish()
     m_status = Cached;
 #if USE(CHROME_NETWORK_STACK)
     if (m_statHubHash) {
-        StatHubCmd(INPUT_CMD_WK_RES_LOAD_FINISHED, (void*)m_statHubHash, 0, (void*)canUseCacheValidator(), 0);
+        UrlProperty urlProperty;
+        urlProperty.bf.cacheable = canUseCacheValidator();
+        urlProperty.bf.mime_type = (unsigned int) type();
+        StatHubCmd(INPUT_CMD_WK_RES_LOAD_FINISHED, (void*)m_statHubHash, 0,
+                   (void*) urlProperty.value, 0);
     }
 #endif //  USE(CHROME_NETWORK_STACK)
 }

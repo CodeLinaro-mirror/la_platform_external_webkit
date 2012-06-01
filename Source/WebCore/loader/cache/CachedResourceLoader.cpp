@@ -4,7 +4,7 @@
     Copyright (C) 2002 Waldo Bastian (bastian@kde.org)
     Copyright (C) 2004, 2005, 2006, 2008 Apple Inc. All rights reserved.
     Copyright (C) 2009 Torch Mobile Inc. http://www.torchmobile.com/
-    Copyright (c) 2011, Code Aurora Forum. All rights reserved
+    Copyright (c) 2011,2012 Code Aurora Forum. All rights reserved
 
     This library is free software; you can redistribute it and/or
     modify it under the terms of the GNU Library General Public
@@ -66,6 +66,8 @@ static void SaveSubURL(CachedResourceLoader* cachedResourceLoader, CachedResourc
         unsigned short main_url_len = cachedResourceLoader->document()->url().string().length();
         unsigned short sub_url_len = resource->url().string().length();
         if (sub_url_len && main_url_len && cachedResourceLoader->document()->url().protocolInHTTPFamily() && KURL(ParsedURLString,resource->url()).protocolInHTTPFamily()) {
+            //FIXME: the url type should have been set here, as an additional parameter to StatHubUpdateSubUrl. But now a seperate update call
+            // is issued when the resource load finsishes in CachedResource::finish()
             StatHubUpdateSubUrl(cachedResourceLoader->document()->url().string().latin1().data(), resource->url().string().latin1().data());
         }
     }
@@ -714,10 +716,10 @@ void CachedResourceLoader::preload(CachedResource::Type type, ResourceRequest& r
 {
     // FIXME: Rip this out when we are sure it is no longer necessary (even for mobile).
     UNUSED_PARAM(referencedFromBody);
-
+    // Only preload immediately if we are doing JS/CSS prefetch
     bool hasRendering = m_document->body() && m_document->body()->renderer();
     bool canBlockParser = type == CachedResource::Script || type == CachedResource::CSSStyleSheet;
-    if (!hasRendering && !canBlockParser) {
+    if (!hasRendering && !canBlockParser && !document()->doJsCssPrefetch()) {
         // Don't preload subresources that can't block the parser before we have something to draw.
         // This helps prevent preloads from delaying first display when bandwidth is limited.
         PendingPreload pendingPreload = { type, request, charset };

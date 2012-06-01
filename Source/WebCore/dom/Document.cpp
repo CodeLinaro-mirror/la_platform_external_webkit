@@ -7,7 +7,7 @@
  * Copyright (C) 2008, 2009 Torch Mobile Inc. All rights reserved. (http://www.torchmobile.com/)
  * Copyright (C) 2008, 2009 Google Inc. All rights reserved.
  * Copyright (C) 2010 Nokia Corporation and/or its subsidiary(-ies)
- * Copyright (c) 2011, Code Aurora Forum. All rights reserved
+ * Copyright (c) 2011, 2012 Code Aurora Forum. All rights reserved
  * Copyright (C) 2011, 2012 Sony Ericsson Mobile Communications AB
  * Copyright (C) 2012 Sony Mobile Communcations AB
  *
@@ -160,6 +160,7 @@
 #include <wtf/StdLibExtras.h>
 #include <wtf/text/StringBuffer.h>
 #include <wtf/text/CString.h>
+#include <cutils/properties.h>
 
 #if ENABLE(SHARED_WORKERS)
 #include "SharedWorkerRepository.h"
@@ -460,6 +461,9 @@ Document::Document(Frame* frame, const KURL& url, bool isXHTML, bool isHTML)
     , m_writingModeSetOnDocumentElement(false)
     , m_writeRecursionIsTooDeep(false)
     , m_writeRecursionDepth(0)
+    , m_externalJs(0)
+    , m_doObjPrfth(true)
+    , m_doJsCssPrfth(false)
 {
     m_document = this;
 
@@ -532,6 +536,14 @@ Document::Document(Frame* frame, const KURL& url, bool isXHTML, bool isHTML)
 #if ENABLE(XHTMLMP)
     m_shouldProcessNoScriptElement = !(m_frame && m_frame->script()->canExecuteScripts(NotAboutToExecuteScript));
 #endif
+
+#if USE(CHROME_NETWORK_STACK)
+    m_doObjPrfth = StatHubIsProcReady("pp_plugin");
+    char value[PROPERTY_VALUE_MAX] = {'\0'};
+    property_get("stathub.pp.prfthmod", value, "0");
+    if (atoi(value) == 1)
+        m_doJsCssPrfth = true;
+#endif //  USE(CHROME_NETWORK_STACK)
 }
 
 Document::~Document()
@@ -588,6 +600,7 @@ Document::~Document()
 
     if (m_implementation)
         m_implementation->ownerDocumentDestroyed();
+    m_externalJs = 0;
 }
 
 void Document::removedLastRef()
