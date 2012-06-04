@@ -272,7 +272,7 @@ bool GraphicsContext3DInternal::initEGL()
     s = eglQueryString(m_dpy, EGL_CLIENT_APIS);
     LOGWEBGL("EGL_CLIENT_APIS = %s", s);
 
-    EGLint* config_attribs = new EGLint[21];
+    EGLint config_attribs[21];
     int p = 0;
     config_attribs[p++] = EGL_BLUE_SIZE;
     config_attribs[p++] = 8;
