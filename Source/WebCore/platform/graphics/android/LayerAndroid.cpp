@@ -929,6 +929,8 @@ bool LayerAndroid::isReady()
     return true;
 }
 
+// Disable fast update for now
+#if (0)
 bool LayerAndroid::updateWithTree(LayerAndroid* newTree)
 {
 // Disable fast update for now
@@ -947,6 +949,7 @@ bool LayerAndroid::updateWithTree(LayerAndroid* newTree)
     return true;
 #endif
 }
+#endif
 
 // Return true to indicate to WebViewCore that the updates
 // are too complicated to be fully handled and we need a full

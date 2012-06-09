@@ -30,7 +30,7 @@
 
 namespace WebCore {
 
-TagNodeList::TagNodeList(PassRefPtr<Node> rootNode, const AtomicString& namespaceURI, const AtomicString& localName)
+TagNodeListNS::TagNodeListNS(PassRefPtr<Node> rootNode, const AtomicString& namespaceURI, const AtomicString& localName)
     : DynamicNodeList(rootNode)
     , m_namespaceURI(namespaceURI)
     , m_localName(localName)
@@ -40,17 +40,35 @@ TagNodeList::TagNodeList(PassRefPtr<Node> rootNode, const AtomicString& namespac
     ASSERT(m_namespaceURI.isNull() || !m_namespaceURI.isEmpty());
 }
 
-TagNodeList::~TagNodeList()
+TagNodeListNS::~TagNodeListNS()
 {
-    m_rootNode->removeCachedTagNodeList(this, QualifiedName(nullAtom, m_localName, m_namespaceURI));
-} 
+    m_rootNode->removeCachedTagNodeListNS(this, QualifiedName(nullAtom, m_localName, m_namespaceURI));
+}
 
-bool TagNodeList::nodeMatches(Element* testNode) const
+bool TagNodeListNS::nodeMatches(Element* testNode) const
 {
     if (!m_isStarAtomNamespaceURI && m_namespaceURI != testNode->namespaceURI())
         return false;
 
     return m_isStarAtomlocalName || m_localName == testNode->localName();
 }
+
+TagNodeList::TagNodeList(PassRefPtr<Node> rootNode, const AtomicString& localName)
+    : DynamicNodeList(rootNode)
+    , m_localName(localName)
+    , m_isStarAtomlocalName(m_localName == starAtom)
+{
+}
+
+TagNodeList::~TagNodeList()
+{
+    m_rootNode->removeCachedTagNodeList(this, m_localName);
+}
+
+bool TagNodeList::nodeMatches(Element* testNode) const
+{
+    return m_isStarAtomlocalName || m_localName == testNode->localName();
+}
+
 
 } // namespace WebCore

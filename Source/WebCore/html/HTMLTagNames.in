@@ -133,7 +133,7 @@ u interfaceName=HTMLElement
 ul interfaceName=HTMLUListElement
 var interfaceName=HTMLElement
 video wrapperOnlyIfMediaIsAvailable, conditional=VIDEO
-wbr interfaceName=HTMLElement
+wbr interfaceName=HTMLWbrElement, JSInterfaceName=HTMLElement
 xmp interfaceName=HTMLPreElement
 
 #if ENABLE_XHTMLMP
