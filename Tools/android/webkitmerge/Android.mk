@@ -19,6 +19,6 @@ LOCAL_SRC_FILES := webkitmerge.cpp
 
 LOCAL_MODULE := webkitmerge
 
-LOCAL_MODULE_TAGS := eng
+LOCAL_MODULE_TAGS := debug
 
 include $(BUILD_HOST_EXECUTABLE)
