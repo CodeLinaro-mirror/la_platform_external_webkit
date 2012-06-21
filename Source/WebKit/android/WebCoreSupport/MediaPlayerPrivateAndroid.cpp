@@ -1,5 +1,6 @@
 /*
  * Copyright 2009, The Android Open Source Project
+ * Copyright (c) 2011-2012, Code Aurora Forum. All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions
@@ -773,6 +774,14 @@ static void OnTimeupdate(JNIEnv* env, jobject obj, int position, int pointer)
 static bool SendSurfaceTexture(JNIEnv* env, jobject obj, jobject surfTex,
                                int baseLayer, int videoLayerId,
                                int textureName, int playerState, int pointer) {
+    WebCore::MediaPlayerPrivate* player = 0;
+    if (pointer) {
+        // Always save the playerState in MediaPlayerPrivate's video layer instance.
+        player = reinterpret_cast<WebCore::MediaPlayerPrivate*>(pointer);
+        VideoLayerAndroid* videoLayer = static_cast<VideoLayerAndroid*>(player->platformLayer());
+        videoLayer->setPlayerState(static_cast<PlayerState>(playerState));
+    }
+
     if (!surfTex)
         return false;
 
@@ -797,11 +806,8 @@ static bool SendSurfaceTexture(JNIEnv* env, jobject obj, jobject surfTex,
     // Set the SurfaceTexture to the layer we found
     videoLayer->setSurfaceTexture(texture, textureName, static_cast<PlayerState>(playerState));
 
-    if (pointer) {
-        WebCore::MediaPlayerPrivate* player =
-            reinterpret_cast<WebCore::MediaPlayerPrivate*>(pointer);
+    if (player)
         videoLayer->registerVideoLayerObserver(player->getVideoLayerObserver());
-    }
 
     return true;
 }

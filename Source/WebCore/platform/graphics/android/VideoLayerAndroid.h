@@ -71,10 +71,10 @@ public:
     GLuint createSpinnerOuterTexture();
     GLuint createSpinnerInnerTexture();
     GLuint createPosterTexture();
+    void setPlayerState(PlayerState state);
 
 private:
     GLuint createTextureFromImage(int buttonType);
-    void init();
     void showProgressSpinner(SkRect& innerRect);
     // Surface texture for showing the video is actually allocated in Java side
     // and passed into this native code.
