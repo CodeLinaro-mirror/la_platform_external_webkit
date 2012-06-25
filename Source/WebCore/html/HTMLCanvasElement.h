@@ -111,6 +111,7 @@ public:
     bool isUsingGpuRendering()  {   return m_gpuRendering;  }
     void setSupportedCompositing(bool val)   {   m_supportedCompositing = val;   }
     static void setGLEnabled(bool val)       {   s_glEnabled = val;              }
+    static int& getRecordingCanvasThreshold()    {   return s_recordingCanvasThreshold;  }
 #endif
 
     GraphicsContext* drawingContext() const;
@@ -206,6 +207,7 @@ private:
     bool m_gpuAccelerationStatus;
     static int s_canvas_id; //Canvas Ids TODO::recycle and overflow checks
     static bool s_glEnabled;
+    static int s_recordingCanvasThreshold;
     CanvasLayerAndroid* m_canvasLayer;
 #endif
 };

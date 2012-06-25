@@ -80,6 +80,7 @@ static const int DefaultHeight = 150;
 //TODO::VA::Make this robust later (prototyping)... needs to be protected by ifdefs for android
 int HTMLCanvasElement::s_canvas_id = 0;
 bool HTMLCanvasElement::s_glEnabled = true;
+int HTMLCanvasElement::s_recordingCanvasThreshold = 5;
 #endif
 
 // Firefox limits width/height to 32767 pixels, but slows down dramatically before it
@@ -132,6 +133,12 @@ HTMLCanvasElement::HTMLCanvasElement(const QualifiedName& tagName, Document* doc
     property_get("debug.gpucanvas", pval2, "1");
 
     m_gpuCanvasEnabled = atoi(pval2) ? true : false;
+
+    //Allow threshold value to be set per device
+    char pval3[PROPERTY_VALUE_MAX];
+    property_get("debug.recordingcanvas.threshold", pval3, "5");
+
+    s_recordingCanvasThreshold = atoi(pval3);
 
     //Set the canvas ID
     SLOGD("++++++++++++++++++++++Setting up the canvas ID to be %d", s_canvas_id);
