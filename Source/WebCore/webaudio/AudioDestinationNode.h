@@ -36,28 +36,26 @@ class AudioContext;
     
 class AudioDestinationNode : public AudioNode, public AudioSourceProvider {
 public:
-    AudioDestinationNode(AudioContext*, float sampleRate);
+    AudioDestinationNode(AudioContext*, double sampleRate);
     virtual ~AudioDestinationNode();
     
     // AudioNode   
     virtual void process(size_t) { }; // we're pulled by hardware so this is never called
-    virtual void reset() { m_currentSampleFrame = 0; };
+    virtual void reset() { m_currentTime = 0.0; };
     
     // The audio hardware calls here periodically to gets its input stream.
     virtual void provideInput(AudioBus*, size_t numberOfFrames);
 
-    size_t currentSampleFrame() { return m_currentSampleFrame; }
-    double currentTime() { return currentSampleFrame() / static_cast<double>(sampleRate()); }
+    double currentTime() { return m_currentTime; }
 
-    virtual float sampleRate() const = 0;
+    virtual double sampleRate() const = 0;
 
     virtual unsigned numberOfChannels() const { return 2; } // FIXME: update when multi-channel (more than stereo) is supported
 
     virtual void startRendering() = 0;
     
 protected:
-    // Counts the number of sample-frames processed by the destination.
-    size_t m_currentSampleFrame;
+    double m_currentTime;
 };
 
 } // namespace WebCore

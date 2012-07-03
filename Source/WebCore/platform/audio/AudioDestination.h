@@ -41,7 +41,7 @@ class AudioSourceProvider;
 
 class AudioDestination {
 public:
-    static PassOwnPtr<AudioDestination> create(AudioSourceProvider&, float sampleRate);
+    static PassOwnPtr<AudioDestination> create(AudioSourceProvider&, double sampleRate);
 
     virtual ~AudioDestination() { }
 
@@ -50,8 +50,8 @@ public:
     virtual bool isPlaying() = 0;
 
     // Sample-rate conversion may happen in AudioDestination to the hardware sample-rate
-    virtual float sampleRate() const = 0;
-    static float hardwareSampleRate();
+    virtual double sampleRate() const = 0;
+    static double hardwareSampleRate();
 };
 
 } // namespace WebCore

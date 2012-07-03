@@ -28,7 +28,7 @@
 
 #include "config.h"
 
-#if ENABLE(WEB_AUDIO)
+#if ENABLE(WEB_AUDIO) & ENABLE(WEBGL)
 
 #include "AudioBuffer.h"
 
@@ -39,15 +39,12 @@
 
 namespace WebCore {
 
-PassRefPtr<AudioBuffer> AudioBuffer::create(unsigned numberOfChannels, size_t numberOfFrames, float sampleRate)
+PassRefPtr<AudioBuffer> AudioBuffer::create(unsigned numberOfChannels, size_t numberOfFrames, double sampleRate)
 {
-    if (sampleRate < 22050 || sampleRate > 96000 || numberOfChannels > 10 || !numberOfFrames)
-        return 0;
-    
     return adoptRef(new AudioBuffer(numberOfChannels, numberOfFrames, sampleRate));
 }
 
-PassRefPtr<AudioBuffer> AudioBuffer::createFromAudioFileData(const void* data, size_t dataSize, bool mixToMono, float sampleRate)
+PassRefPtr<AudioBuffer> AudioBuffer::createFromAudioFileData(const void* data, size_t dataSize, bool mixToMono, double sampleRate)
 {
     OwnPtr<AudioBus> bus = createBusFromInMemoryAudioFile(data, dataSize, mixToMono, sampleRate);
     if (bus.get())
@@ -56,7 +53,7 @@ PassRefPtr<AudioBuffer> AudioBuffer::createFromAudioFileData(const void* data, s
     return 0;
 }
 
-AudioBuffer::AudioBuffer(unsigned numberOfChannels, size_t numberOfFrames, float sampleRate)
+AudioBuffer::AudioBuffer(unsigned numberOfChannels, size_t numberOfFrames, double sampleRate)
     : m_gain(1.0)
     , m_sampleRate(sampleRate)
     , m_length(numberOfFrames)
@@ -79,7 +76,8 @@ AudioBuffer::AudioBuffer(AudioBus* bus)
     m_channels.reserveCapacity(numberOfChannels);
     for (unsigned i = 0; i < numberOfChannels; ++i) {
         RefPtr<Float32Array> channelDataArray = Float32Array::create(m_length);
-        channelDataArray->setRange(bus->channel(i)->data(), m_length, 0);
+        ExceptionCode ec;
+        channelDataArray->setRange(bus->channel(i)->data(), m_length, 0, ec);
         m_channels.append(channelDataArray);
     }
 }
@@ -100,11 +98,13 @@ Float32Array* AudioBuffer::getChannelData(unsigned channelIndex)
 void AudioBuffer::zero()
 {
     for (unsigned i = 0; i < m_channels.size(); ++i) {
-        if (getChannelData(i))
-            getChannelData(i)->zeroRange(0, length());
+        if (getChannelData(i)) {
+            ExceptionCode ec;
+            getChannelData(i)->zeroRange(0, length(), ec);
+        }
     }
 }
 
 } // namespace WebCore
 
-#endif // ENABLE(WEB_AUDIO)
+#endif // ENABLE(WEB_AUDIO) & ENABLE(WEBGL)

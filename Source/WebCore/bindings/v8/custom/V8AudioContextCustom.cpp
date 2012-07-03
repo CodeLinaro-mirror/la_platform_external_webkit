@@ -43,12 +43,6 @@ v8::Handle<v8::Value> V8AudioContext::constructorCallback(const v8::Arguments& a
 {
     INC_STATS("DOM.AudioContext.Contructor");
 
-    if (!args.IsConstructCall())
-        return throwError("AudioContext constructor cannot be called as a function.", V8Proxy::TypeError);
-
-    if (ConstructorMode::current() == ConstructorMode::WrapExistingObject)
-        return args.Holder();
-
     Frame* frame = V8Proxy::retrieveFrameForCurrentContext();
     if (!frame)
         return throwError("AudioContext constructor associated frame is unavailable", V8Proxy::ReferenceError);
@@ -62,8 +56,6 @@ v8::Handle<v8::Value> V8AudioContext::constructorCallback(const v8::Arguments& a
     if (!args.Length()) {
         // Constructor for default AudioContext which talks to audio hardware.
         audioContext = AudioContext::create(document);
-        if (!audioContext.get())
-            return throwError("audio resources unavailable for AudioContext construction", V8Proxy::SyntaxError);
     } else {
         // Constructor for offline (render-target) AudioContext which renders into an AudioBuffer.
         // new AudioContext(in unsigned long numberOfChannels, in unsigned long numberOfFrames, in float sampleRate);
@@ -72,22 +64,17 @@ v8::Handle<v8::Value> V8AudioContext::constructorCallback(const v8::Arguments& a
 
         bool ok = false;
 
-        int32_t numberOfChannels = toInt32(args[0], ok);
-        if (!ok || numberOfChannels <= 0 || numberOfChannels > 10)
+        unsigned numberOfChannels = toInt32(args[0], ok);
+        if (!ok)
             return throwError("Invalid number of channels", V8Proxy::SyntaxError);
 
-        int32_t numberOfFrames = toInt32(args[1], ok);
-        if (!ok || numberOfFrames <= 0)
+        unsigned numberOfFrames = toInt32(args[1], ok);
+        if (!ok)
             return throwError("Invalid number of frames", V8Proxy::SyntaxError);
 
         float sampleRate = toFloat(args[2]);
-        if (sampleRate <= 0)
-            return throwError("Invalid sample rate", V8Proxy::SyntaxError);
 
-        ExceptionCode ec = 0;
-        audioContext = AudioContext::createOfflineContext(document, numberOfChannels, numberOfFrames, sampleRate, ec);
-        if (ec)
-            return throwError(ec);
+        audioContext = AudioContext::createOfflineContext(document, numberOfChannels, numberOfFrames, sampleRate);
     }
 
     if (!audioContext.get())
@@ -135,12 +122,12 @@ v8::Handle<v8::Value> V8AudioContext::createBufferCallback(const v8::Arguments& 
 
     bool ok = false;
     
-    int32_t numberOfChannels = toInt32(args[0], ok);
-    if (!ok || numberOfChannels <= 0 || numberOfChannels > 10)
+    unsigned numberOfChannels = toInt32(args[0], ok);
+    if (!ok)
         return throwError("Invalid number of channels", V8Proxy::SyntaxError);
     
-    int32_t numberOfFrames = toInt32(args[1], ok);
-    if (!ok || numberOfFrames <= 0)
+    unsigned numberOfFrames = toInt32(args[1], ok);
+    if (!ok)
         return throwError("Invalid number of frames", V8Proxy::SyntaxError);
     
     float sampleRate = toFloat(args[2]);

@@ -35,7 +35,7 @@ namespace WebCore {
 
 class AudioSourceNode : public AudioNode {
 public:
-    AudioSourceNode(AudioContext* context, float sampleRate)
+    AudioSourceNode(AudioContext* context, double sampleRate)
         : AudioNode(context, sampleRate)
     {
     }

@@ -35,7 +35,6 @@
 #include "AudioChannel.h"
 #include "Biquad.h"
 #include "FFTFrame.h"
-#include "FloatConversion.h"
 #include <wtf/MathExtras.h>
 
 using namespace std;
@@ -46,16 +45,13 @@ namespace WebCore {
 // This represents the initial delay before the most energetic part of the impulse response.
 // The sample-frame delay is removed from the impulseP impulse response, and this value  is returned.
 // the length of the passed in AudioChannel must be a power of 2.
-static float extractAverageGroupDelay(AudioChannel* channel, size_t analysisFFTSize)
+static double extractAverageGroupDelay(AudioChannel* channel, size_t analysisFFTSize)
 {
     ASSERT(channel);
         
-    float* impulseP = channel->mutableData();
+    float* impulseP = channel->data();
     
-    bool isSizeGood = channel->length() >= analysisFFTSize;
-    ASSERT(isSizeGood);
-    if (!isSizeGood)
-        return 0;
+    ASSERT(channel->length() >= analysisFFTSize);
     
     // Check for power-of-2.
     ASSERT(1UL << static_cast<unsigned>(log2(analysisFFTSize)) == analysisFFTSize);
@@ -63,14 +59,14 @@ static float extractAverageGroupDelay(AudioChannel* channel, size_t analysisFFTS
     FFTFrame estimationFrame(analysisFFTSize);
     estimationFrame.doFFT(impulseP);
 
-    float frameDelay = narrowPrecisionToFloat(estimationFrame.extractAverageGroupDelay());
+    double frameDelay = estimationFrame.extractAverageGroupDelay();
     estimationFrame.doInverseFFT(impulseP);
 
     return frameDelay;
 }
 
-HRTFKernel::HRTFKernel(AudioChannel* channel, size_t fftSize, float sampleRate, bool bassBoost)
-    : m_frameDelay(0)
+HRTFKernel::HRTFKernel(AudioChannel* channel, size_t fftSize, double sampleRate, bool bassBoost)
+    : m_frameDelay(0.0)
     , m_sampleRate(sampleRate)
 {
     ASSERT(channel);
@@ -78,7 +74,7 @@ HRTFKernel::HRTFKernel(AudioChannel* channel, size_t fftSize, float sampleRate, 
     // Determine the leading delay (average group delay) for the response.
     m_frameDelay = extractAverageGroupDelay(channel, fftSize / 2);
 
-    float* impulseResponse = channel->mutableData();
+    float* impulseResponse = channel->data();
     size_t responseLength = channel->length();
 
     if (bassBoost) {
@@ -114,28 +110,28 @@ PassOwnPtr<AudioChannel> HRTFKernel::createImpulseResponse()
 
     // Add leading delay back in.
     fftFrame.addConstantGroupDelay(m_frameDelay);
-    fftFrame.doInverseFFT(channel->mutableData());
+    fftFrame.doInverseFFT(channel->data());
 
     return channel.release();
 }
 
 // Interpolates two kernels with x: 0 -> 1 and returns the result.
-PassRefPtr<HRTFKernel> HRTFKernel::createInterpolatedKernel(HRTFKernel* kernel1, HRTFKernel* kernel2, float x)
+PassRefPtr<HRTFKernel> HRTFKernel::createInterpolatedKernel(HRTFKernel* kernel1, HRTFKernel* kernel2, double x)
 {
     ASSERT(kernel1 && kernel2);
     if (!kernel1 || !kernel2)
         return 0;
  
     ASSERT(x >= 0.0 && x < 1.0);
-    x = min(1.0f, max(0.0f, x));
+    x = min(1.0, max(0.0, x));
     
-    float sampleRate1 = kernel1->sampleRate();
-    float sampleRate2 = kernel2->sampleRate();
+    double sampleRate1 = kernel1->sampleRate();
+    double sampleRate2 = kernel2->sampleRate();
     ASSERT(sampleRate1 == sampleRate2);
     if (sampleRate1 != sampleRate2)
         return 0;
     
-    float frameDelay = (1 - x) * kernel1->frameDelay() + x * kernel2->frameDelay();
+    double frameDelay = (1.0 - x) * kernel1->frameDelay() + x * kernel2->frameDelay();
     
     OwnPtr<FFTFrame> interpolatedFrame = FFTFrame::createInterpolatedFrame(*kernel1->fftFrame(), *kernel2->fftFrame(), x);
     return HRTFKernel::create(interpolatedFrame.release(), frameDelay, sampleRate1);

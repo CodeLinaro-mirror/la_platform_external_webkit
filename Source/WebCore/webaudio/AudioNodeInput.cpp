@@ -41,8 +41,8 @@ AudioNodeInput::AudioNodeInput(AudioNode* node)
     : m_node(node)
     , m_renderingStateNeedUpdating(false)
 {
-    // Set to mono by default.
-    m_internalSummingBus = adoptPtr(new AudioBus(1, AudioNode::ProcessingSizeInFrames));
+    m_monoSummingBus = adoptPtr(new AudioBus(1, AudioNode::ProcessingSizeInFrames));
+    m_stereoSummingBus = adoptPtr(new AudioBus(2, AudioNode::ProcessingSizeInFrames));
 }
 
 void AudioNodeInput::connect(AudioNodeOutput* output)
@@ -159,18 +159,6 @@ void AudioNodeInput::updateRenderingState()
     }
 }
 
-void AudioNodeInput::updateInternalBus()
-{
-    ASSERT(context()->isAudioThread() && context()->isGraphOwner());
-
-    unsigned numberOfInputChannels = numberOfChannels();
-
-    if (numberOfInputChannels == m_internalSummingBus->numberOfChannels())
-        return;
-
-    m_internalSummingBus = adoptPtr(new AudioBus(numberOfInputChannels, AudioNode::ProcessingSizeInFrames));
-}
-
 unsigned AudioNodeInput::numberOfChannels() const
 {
     // Find the number of channels of the connection with the largest number of channels.
@@ -213,9 +201,17 @@ AudioBus* AudioNodeInput::internalSummingBus()
 {
     ASSERT(context()->isAudioThread());
 
-    ASSERT(numberOfRenderingChannels() == m_internalSummingBus->numberOfChannels());
-
-    return m_internalSummingBus.get();
+    // We must pick a summing bus which is the right size to handle the largest connection.
+    switch (numberOfRenderingChannels()) {
+    case 1:
+        return m_monoSummingBus.get();
+    case 2:
+        return m_stereoSummingBus.get();
+    // FIXME: could implement more than just mono and stereo mixing in the future
+    }
+    
+    ASSERT_NOT_REACHED();
+    return 0;
 }
 
 void AudioNodeInput::sumAllConnections(AudioBus* summingBus, size_t framesToProcess)

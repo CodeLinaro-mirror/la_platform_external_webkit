@@ -33,9 +33,9 @@ namespace WebCore {
 
 class EqualPowerPanner : public Panner {
 public:
-    EqualPowerPanner(float sampleRate);
+    EqualPowerPanner(double sampleRate);
 
-    virtual void pan(double azimuth, double elevation, const AudioBus* inputBus, AudioBus* outputBuf, size_t framesToProcess);
+    virtual void pan(double azimuth, double elevation, AudioBus* inputBus, AudioBus* outputBuf, size_t framesToProcess);
 
     virtual void reset() { m_isFirstRender = true; }
 
