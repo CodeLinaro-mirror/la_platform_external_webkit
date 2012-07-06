@@ -369,12 +369,13 @@ bool ContainerNode::replaceChild(PassRefPtr<Node> newChild, Node* oldChild, Exce
 
 void ContainerNode::willRemove()
 {
-    Vector<RefPtr<Node>, 10> nodes;
-    nodes.reserveInitialCapacity(childNodeCount());
-    for (Node* n = m_lastChild; n; n = n->previousSibling())
-        nodes.append(n);
-    for (; nodes.size(); nodes.removeLast())
-        nodes.last().get()->willRemove();
+    Node* next;
+    Node* child = m_firstChild;
+    while (child) {
+        next = child->nextSibling();
+        child->willRemove();
+        child = next;
+    }
     Node::willRemove();
 }
 

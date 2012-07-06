@@ -556,16 +556,16 @@ NodeRareData* Node::createRareData()
 
 Element* Node::shadowHost() const
 {
-    return toElement(getFlag(IsShadowRootFlag) ? parent() : 0);
+    return toElement(isShadowRoot() ? parent() : 0);
 }
 
 void Node::setShadowHost(Element* host)
 {
     ASSERT(!parentNode() && !isSVGShadowRoot());
     if (host)
-        setFlag(IsShadowRootFlag);
+        setFlag(IsShadowRootOrSVGShadowRootFlag);
     else
-        clearFlag(IsShadowRootFlag);
+        clearFlag(IsShadowRootOrSVGShadowRootFlag);
 
     setParent(host);
     updatePreviousNode();
@@ -619,14 +619,13 @@ void Node::setNodeValue(const String& /*nodeValue*/, ExceptionCode& ec)
 
 PassRefPtr<NodeList> Node::childNodes()
 {
-    NodeRareData* data = ensureRareData();
-    if (!data->nodeLists()) {
-        data->setNodeLists(NodeListsNodeData::create());
-        if (document())
-            document()->addNodeListCache();
-    }
+    NodeListsNodeData* data = ensureRareData()->ensureNodeLists(this);
+    if (data->m_childNodeListCache)
+        return PassRefPtr<ChildNodeList>(data->m_childNodeListCache);
 
-    return ChildNodeList::create(this, data->nodeLists()->m_childNodeListCaches.get());
+    RefPtr<ChildNodeList> childNodeList = ChildNodeList::create(this);
+    data->m_childNodeListCache = childNodeList.get();
+    return childNodeList.release();
 }
 
 Node *Node::lastDescendant() const
@@ -1110,7 +1109,7 @@ void Node::removeCachedNameNodeList(NameNodeList* list, const String& nodeName)
     data->m_nameNodeListCache.remove(nodeName);
 }
 
-void Node::removeCachedTagNodeList(TagNodeList* list, const QualifiedName& name)
+void Node::removeCachedTagNodeList(TagNodeList* list, const AtomicString& name)
 {
     ASSERT(rareData());
     ASSERT(rareData()->nodeLists());
@@ -1121,6 +1120,17 @@ void Node::removeCachedTagNodeList(TagNodeList* list, const QualifiedName& name)
     data->m_tagNodeListCache.remove(name.impl());
 }
 
+void Node::removeCachedTagNodeListNS(TagNodeListNS* list, const QualifiedName& name)
+{
+    ASSERT(rareData());
+    ASSERT(rareData()->nodeLists());
+    ASSERT_UNUSED(list, list->hasOwnCaches());
+
+    NodeListsNodeData* data = rareData()->nodeLists();
+    ASSERT_UNUSED(list, list == data->m_tagNodeListCacheNS.get(name.impl()));
+    data->m_tagNodeListCacheNS.remove(name.impl());
+}
+
 void Node::removeCachedLabelsNodeList(DynamicNodeList* list)
 {
     ASSERT(rareData());
@@ -1129,6 +1139,16 @@ void Node::removeCachedLabelsNodeList(DynamicNodeList* list)
     
     NodeListsNodeData* data = rareData()->nodeLists();
     data->m_labelsNodeListCache = 0;
+}
+
+void Node::removeCachedChildNodeList(DynamicNodeList* list)
+{
+    ASSERT(rareData());
+    ASSERT(rareData()->nodeLists());
+    ASSERT_UNUSED(list, list->hasOwnCaches());
+
+    NodeListsNodeData* data = rareData()->nodeLists();
+    data->m_childNodeListCache = 0;
 }
 
 Node* Node::traverseNextNode(const Node* stayWithin) const
@@ -1229,12 +1249,12 @@ Node* Node::traversePreviousNode(const Node* stayWithin) const
 
 Node* Node::traversePreviousNodePostOrder(const Node* stayWithin) const
 {
-    if (lastChild())
-        return lastChild();
+    if (Node* lc = lastChild())
+        return lc;
     if (this == stayWithin)
         return 0;
-    if (previousSibling())
-        return previousSibling();
+    if (Node* ps = previousSibling())
+        return ps;
     const Node *n = this;
     while (n && !n->previousSibling() && (!stayWithin || n->parentNode() != stayWithin))
         n = n->parentNode();
@@ -1247,8 +1267,8 @@ Node* Node::traversePreviousSiblingPostOrder(const Node* stayWithin) const
 {
     if (this == stayWithin)
         return 0;
-    if (previousSibling())
-        return previousSibling();
+    if (Node* ps = previousSibling())
+        return ps;
     const Node *n = this;
     while (n && !n->previousSibling() && (!stayWithin || n->parentNode() != stayWithin))
         n = n->parentNode();
@@ -1394,14 +1414,20 @@ void Node::attach()
     // FIXME: This is O(N^2) for the innerHTML case, where all children are replaced at once (and not attached).
     // If this node got a renderer it may be the previousRenderer() of sibling text nodes and thus affect the
     // result of Text::rendererIsNeeded() for those nodes.
-    if (renderer()) {
+    RenderObject* renderer = this->renderer();
+    if (renderer) {
         for (Node* next = nextSibling(); next; next = next->nextSibling()) {
             if (next->renderer())
                 break;
             if (!next->attached())
                 break;  // Assume this means none of the following siblings are attached.
-            if (next->isTextNode())
+            if (next->isTextNode()) {
+                static_cast<Text*>(next)->setPreviousRenderer(renderer);
                 next->createRendererIfNeeded();
+                if (next->renderer())
+                    renderer = next->renderer();
+                static_cast<Text*>(next)->setPreviousRenderer(0);
+            }
         }
     }
 
@@ -1427,23 +1453,7 @@ void Node::detach()
     if (inActiveChain())
         doc->activeChainNodeDetached(this);
 
-    clearFlag(IsActiveFlag);
-    clearFlag(IsHoveredFlag);
-    clearFlag(InActiveChainFlag);
-    clearFlag(IsAttachedFlag);
-
-    clearFlag(InDetachFlag);
-}
-
-RenderObject* Node::previousRenderer()
-{
-    // FIXME: We should have the same O(N^2) avoidance as nextRenderer does
-    // however, when I tried adding it, several tests failed.
-    for (Node* n = previousSibling(); n; n = n->previousSibling()) {
-        if (n->renderer())
-            return n->renderer();
-    }
-    return 0;
+    clearFlag(NodeDetachClearFlags);
 }
 
 RenderObject* Node::nextRenderer()
@@ -1758,44 +1768,45 @@ bool Node::inSameContainingBlockFlowElement(Node *n)
 
 PassRefPtr<NodeList> Node::getElementsByTagName(const AtomicString& name)
 {
-    return getElementsByTagNameNS(starAtom, name);
+    if (name.isNull())
+        return 0;
+
+    NodeListsNodeData* data = ensureRareData()->ensureNodeLists(this);
+
+    AtomicString localNameAtom = document()->isHTMLDocument() ? name.lower() : name;
+
+    pair<NodeListsNodeData::TagNodeListCache::iterator, bool> result = data->m_tagNodeListCache.add(localNameAtom.impl(), 0);
+    if (!result.second)
+        return PassRefPtr<TagNodeList>(result.first->second);
+
+    RefPtr<TagNodeList> list = TagNodeList::create(this, localNameAtom);
+    result.first->second = list.get();
+    return list.release();
 }
  
 PassRefPtr<NodeList> Node::getElementsByTagNameNS(const AtomicString& namespaceURI, const AtomicString& localName)
 {
     if (localName.isNull())
         return 0;
-    
-    NodeRareData* data = ensureRareData();
-    if (!data->nodeLists()) {
-        data->setNodeLists(NodeListsNodeData::create());
-        document()->addNodeListCache();
-    }
 
-    String name = localName;
-    if (document()->isHTMLDocument())
-        name = localName.lower();
-    
-    AtomicString localNameAtom = name;
-        
-    pair<NodeListsNodeData::TagNodeListCache::iterator, bool> result = data->nodeLists()->m_tagNodeListCache.add(QualifiedName(nullAtom, localNameAtom, namespaceURI).impl(), 0);
+    NodeListsNodeData* data = ensureRareData()->ensureNodeLists(this);
+
+    AtomicString localNameAtom = document()->isHTMLDocument() ? localName.lower() : localName;
+
+    pair<NodeListsNodeData::TagNodeListCacheNS::iterator, bool> result = data->m_tagNodeListCacheNS.add(QualifiedName(nullAtom, localNameAtom, namespaceURI).impl(), 0);
     if (!result.second)
-        return PassRefPtr<TagNodeList>(result.first->second);
-    
-    RefPtr<TagNodeList> list = TagNodeList::create(this, namespaceURI.isEmpty() ? nullAtom : namespaceURI, localNameAtom);
+        return PassRefPtr<TagNodeListNS>(result.first->second);
+
+    RefPtr<TagNodeListNS> list = TagNodeListNS::create(this, namespaceURI.isEmpty() ? nullAtom : namespaceURI, localNameAtom);
     result.first->second = list.get();
     return list.release();
 }
 
 PassRefPtr<NodeList> Node::getElementsByName(const String& elementName)
 {
-    NodeRareData* data = ensureRareData();
-    if (!data->nodeLists()) {
-        data->setNodeLists(NodeListsNodeData::create());
-        document()->addNodeListCache();
-    }
+    NodeListsNodeData* data = ensureRareData()->ensureNodeLists(this);
 
-    pair<NodeListsNodeData::NameNodeListCache::iterator, bool> result = data->nodeLists()->m_nameNodeListCache.add(elementName, 0);
+    pair<NodeListsNodeData::NameNodeListCache::iterator, bool> result = data->m_nameNodeListCache.add(elementName, 0);
     if (!result.second)
         return PassRefPtr<NodeList>(result.first->second);
 
@@ -1806,13 +1817,9 @@ PassRefPtr<NodeList> Node::getElementsByName(const String& elementName)
 
 PassRefPtr<NodeList> Node::getElementsByClassName(const String& classNames)
 {
-    NodeRareData* data = ensureRareData();
-    if (!data->nodeLists()) {
-        data->setNodeLists(NodeListsNodeData::create());
-        document()->addNodeListCache();
-    }
+    NodeListsNodeData* data = ensureRareData()->ensureNodeLists(this);
 
-    pair<NodeListsNodeData::ClassNodeListCache::iterator, bool> result = data->nodeLists()->m_classNodeListCache.add(classNames, 0);
+    pair<NodeListsNodeData::ClassNodeListCache::iterator, bool> result = data->m_classNodeListCache.add(classNames, 0);
     if (!result.second)
         return PassRefPtr<NodeList>(result.first->second);
 
@@ -2489,10 +2496,14 @@ void Node::formatForDebugger(char* buffer, unsigned length) const
 
 void NodeListsNodeData::invalidateCaches()
 {
-    m_childNodeListCaches->reset();
+    if (m_childNodeListCache)
+        m_childNodeListCache->invalidateCache();
 
     if (m_labelsNodeListCache)
         m_labelsNodeListCache->invalidateCache();
+    TagNodeListCacheNS::const_iterator tagCacheEndNS = m_tagNodeListCacheNS.end();
+    for (TagNodeListCacheNS::const_iterator it = m_tagNodeListCacheNS.begin(); it != tagCacheEndNS; ++it)
+        it->second->invalidateCache();
     TagNodeListCache::const_iterator tagCacheEnd = m_tagNodeListCache.end();
     for (TagNodeListCache::const_iterator it = m_tagNodeListCache.begin(); it != tagCacheEnd; ++it)
         it->second->invalidateCache();
@@ -2517,9 +2528,15 @@ bool NodeListsNodeData::isEmpty() const
     if (!m_listsWithCaches.isEmpty())
         return false;
 
-    if (m_childNodeListCaches->refCount())
+    if (m_childNodeListCache)
         return false;
     
+    TagNodeListCacheNS::const_iterator tagCacheEndNS = m_tagNodeListCacheNS.end();
+    for (TagNodeListCacheNS::const_iterator it = m_tagNodeListCacheNS.begin(); it != tagCacheEndNS; ++it) {
+        if (it->second->refCount())
+            return false;
+    }
+
     TagNodeListCache::const_iterator tagCacheEnd = m_tagNodeListCache.end();
     for (TagNodeListCache::const_iterator it = m_tagNodeListCache.begin(); it != tagCacheEnd; ++it) {
         if (it->second->refCount())

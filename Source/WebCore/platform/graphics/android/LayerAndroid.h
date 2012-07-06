@@ -297,7 +297,7 @@ public:
     // Update layers using another tree. Only works for basic properties
     // such as the position, the transform. Return true if anything more
     // complex is needed.
-    bool updateWithTree(LayerAndroid*);
+    bool updateWithTree(LayerAndroid*) { return true; };
     virtual bool updateWithLayer(LayerAndroid*);
 
     int type() { return m_type; }

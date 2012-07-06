@@ -122,7 +122,7 @@ HTMLCanvasElement::HTMLCanvasElement(const QualifiedName& tagName, Document* doc
 {
     ASSERT(hasTagName(canvasTag));
 
-# if PLATFORM(ANDROID)
+# if PLATFORM(ANDROID) // TODO: This seems to be a overkill here, should be moved to Document or Settings.
     char pval[PROPERTY_VALUE_MAX];
     property_get("debug.recordingcanvas", pval, "1");
 
@@ -137,6 +137,11 @@ HTMLCanvasElement::HTMLCanvasElement(const QualifiedName& tagName, Document* doc
     SLOGD("++++++++++++++++++++++Setting up the canvas ID to be %d", s_canvas_id);
     m_canvasLayer->setCanvasID(s_canvas_id);
     ++s_canvas_id;
+#endif
+#if ENABLE(DASHBOARD_SUPPORT)
+    Settings* settings = document()->settings();
+    if (settings && settings->usesDashboardBackwardCompatibilityMode())
+        setIeForbidsInsertHTML();
 #endif
 }
 
