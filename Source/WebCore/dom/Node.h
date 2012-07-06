@@ -4,6 +4,7 @@
  *           (C) 2001 Dirk Mueller (mueller@kde.org)
  * Copyright (C) 2004, 2005, 2006, 2007, 2008, 2009, 2010, 2011 Apple Inc. All rights reserved.
  * Copyright (C) 2008, 2009 Torch Mobile Inc. All rights reserved. (http://www.torchmobile.com/)
+ * Copyright (C) 2012 Code Aurora Forum. All rights reserved.
  *
  * This library is free software; you can redistribute it and/or
  * modify it under the terms of the GNU Library General Public
@@ -143,8 +144,8 @@ public:
     virtual NodeType nodeType() const = 0;
     ContainerNode* parentNode() const;
     Element* parentElement() const;
-    Node* previousSibling() const { return m_previous; }
-    Node* nextSibling() const { return m_next; }
+    ALWAYS_INLINE Node* previousSibling() const { return m_previous; }
+    ALWAYS_INLINE Node* nextSibling() const { return m_next; }
     PassRefPtr<NodeList> childNodes();
     Node* firstChild() const;
     Node* lastChild() const;
@@ -187,14 +188,14 @@ public:
     
     // Other methods (not part of DOM)
 
-    bool isElementNode() const { return getFlag(IsElementFlag); }
-    bool isContainerNode() const { return getFlag(IsContainerFlag); }
+    ALWAYS_INLINE bool isElementNode() const { return getFlag(IsElementFlag); }
+    ALWAYS_INLINE bool isContainerNode() const { return getFlag(IsContainerFlag); }
     bool isTextNode() const { return getFlag(IsTextFlag); }
 
     bool isHTMLElement() const { return getFlag(IsHTMLFlag); }
 
-    bool isSVGElement() const { return getFlag(IsSVGFlag); }
-    virtual bool isSVGShadowRoot() const { return false; }
+    ALWAYS_INLINE bool isSVGElement() const { return getFlag(IsSVGFlag); }
+    ALWAYS_INLINE virtual bool isSVGShadowRoot() const { return false; }
 #if ENABLE(SVG)
     SVGUseElement* svgShadowHost() const;
 #endif
@@ -241,6 +242,12 @@ public:
     // These low-level calls give the caller responsibility for maintaining the integrity of the tree.
     void setPreviousSibling(Node* previous) { m_previous = previous; }
     void setNextSibling(Node* next) { m_next = next; }
+    void updatePreviousNode() { m_previousNode = traversePreviousNode(); if (m_previousNode) m_previousNode->setNextNode(this); }
+    void updateNextNode() { m_nextNode = traverseNextNode(); if (m_nextNode) m_nextNode->setPreviousNode(this); }
+    void updatePrevNextNodesInSubtree();
+
+    void setPreviousNode(Node* previous) { m_previousNode = previous; }
+    void setNextNode(Node* next) { m_nextNode = next; }
 
     // FIXME: These two functions belong in editing -- "atomic node" is an editing concept.
     Node* previousNodeConsideringAtomicNodes() const;
@@ -392,11 +399,17 @@ public:
     // This can be used to restrict traversal to a particular sub-tree.
     Node* traverseNextNode(const Node* stayWithin = 0) const;
 
+    Node* traverseNextNodeFastPath() const { return m_nextNode; }
+
+    Node* lastDescendantNode(bool includeThis = false) const;
+
     // Like traverseNextNode, but skips children and starts with the next sibling.
     Node* traverseNextSibling(const Node* stayWithin = 0) const;
 
     // Does a reverse pre-order traversal to find the node that comes before the current one in document order
     Node* traversePreviousNode(const Node* stayWithin = 0) const;
+
+    Node* traversePreviousNodeFastPath() const { return m_previousNode; }
 
     // Like traverseNextNode, but visits parents after their children.
     Node* traverseNextNodePostOrder() const;
@@ -631,7 +644,7 @@ private:
 
     // 4 bits remaining
 
-    bool getFlag(NodeFlags mask) const { return m_nodeFlags & mask; }
+    ALWAYS_INLINE bool getFlag(NodeFlags mask) const { return m_nodeFlags & mask; }
     void setFlag(bool f, NodeFlags mask) const { m_nodeFlags = (m_nodeFlags & ~mask) | (-(int32_t)f & mask); } 
     void setFlag(NodeFlags mask) const { m_nodeFlags |= mask; } 
     void clearFlag(NodeFlags mask) const { m_nodeFlags &= ~mask; } 
@@ -704,6 +717,8 @@ private:
     Node* m_next;
     RenderObject* m_renderer;
     mutable uint32_t m_nodeFlags;
+    Node* m_previousNode;
+    Node* m_nextNode;
 
 protected:
     bool isParsingChildrenFinished() const { return getFlag(IsParsingChildrenFinishedFlag); }

@@ -7161,7 +7161,7 @@ void CSSStyleSelector::SelectorChecker::allVisitedStateChanged()
 {
     if (m_linksCheckedForVisitedState.isEmpty())
         return;
-    for (Node* node = m_document; node; node = node->traverseNextNode()) {
+    for (Node* node = m_document; node; node = node->traverseNextNodeFastPath()) {
         if (node->isLink())
             node->setNeedsStyleRecalc();
     }
@@ -7171,7 +7171,7 @@ void CSSStyleSelector::SelectorChecker::visitedStateChanged(LinkHash visitedHash
 {
     if (!m_linksCheckedForVisitedState.contains(visitedHash))
         return;
-    for (Node* node = m_document; node; node = node->traverseNextNode()) {
+    for (Node* node = m_document; node; node = node->traverseNextNodeFastPath()) {
         const AtomicString* attr = linkAttribute(node);
         if (attr && visitedLinkHash(m_document->baseURL(), *attr) == visitedHash)
             node->setNeedsStyleRecalc();

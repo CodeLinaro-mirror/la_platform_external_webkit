@@ -1,5 +1,6 @@
 /*
  * Copyright 2006, The Android Open Source Project
+ * Copyright (C) 2012 Code Aurora Forum. All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions
@@ -358,7 +359,7 @@ void CacheBuilder::Debug::groups() {
     do {
         if ((atLeastOne |= isFocusable(node)) != false)
             break;
-    } while ((node = node->traverseNextNode()) != NULL);
+    } while ((node = node->traverseNextNodeFastPath()) != NULL);
     int focusIndex = -1;
     if (atLeastOne == false) {
         DUMP_NAV_LOGD("static DebugTestNode TEST%s_RECTS[] = {\n"
@@ -522,7 +523,7 @@ void CacheBuilder::Debug::groups() {
  #endif
             count++;
             newLine();
-        } while ((node = node->traverseNextNode()) != NULL);
+        } while ((node = node->traverseNextNodeFastPath()) != NULL);
         DUMP_NAV_LOGD("}; // focusables = %d\n", count - 1);
         DUMP_NAV_LOGD("\n");
         DUMP_NAV_LOGD("static int TEST%s_RECT_COUNT = %d;\n\n", name, count - 1);
@@ -601,7 +602,7 @@ void CacheBuilder::Debug::groups() {
                     }
                 }
             }
-        } while ((node = node->traverseNextNode()) != NULL);
+        } while ((node = node->traverseNextNodeFastPath()) != NULL);
         if (hasRectParts)
             DUMP_NAV_LOGD("{0}\n};\n\n");
         else
@@ -682,7 +683,7 @@ int CacheBuilder::Debug::ParentIndex(Node* node, int count, Node* parent)
     result = count;
     do {
         result++;
-    } while ((node = node->traverseNextNode()) != NULL && node != parent);
+    } while ((node = node->traverseNextNodeFastPath()) != NULL && node != parent);
     if (node != NULL)
         return result;
     ASSERT(0);
@@ -1034,7 +1035,7 @@ void CacheBuilder::BuildFrame(Frame* root, Frame* frame,
         TrackLayer(layerTracker, frame->contentRenderer(), node->lastChild(),
             globalOffsetX, globalOffsetY);
 #endif
-    while (walk.mMore || (node = node->traverseNextNode()) != NULL) {
+    while (walk.mMore || (node = node->traverseNextNodeFastPath()) != NULL) {
 #if DUMP_NAV_CACHE
         nodeIndex++;
 #endif
@@ -2546,7 +2547,7 @@ void CacheBuilder::FindResetNumber(FindState* state)
 IntRect CacheBuilder::getAreaRect(const HTMLAreaElement* area)
 {
     Node* node = area->document();
-    while ((node = node->traverseNextNode()) != NULL) {
+    while ((node = node->traverseNextNodeFastPath()) != NULL) {
         RenderObject* renderer = node->renderer();
         if (renderer && renderer->isRenderImage()) {
             RenderImage* image = static_cast<RenderImage*>(renderer);
@@ -2762,7 +2763,7 @@ bool CacheBuilder::isFocusableText(NodeWalk* walk, bool more, Node* node,
                                     break;
                                 start = 0;
                                 do {
-                                    temp = temp->traverseNextNode();
+                                    temp = temp->traverseNextNodeFastPath();
                                     ASSERT(temp);
                                 } while (temp->isTextNode() == false);
                                 // add a space in between text nodes to avoid 
@@ -2792,7 +2793,7 @@ bool CacheBuilder::isFocusableText(NodeWalk* walk, bool more, Node* node,
                 do {
                     do {
                         if (node)
-                            node = node->traverseNextNode();
+                            node = node->traverseNextNodeFastPath();
                         if (node == NULL || node->hasTagName(HTMLNames::aTag)
                                 || node->hasTagName(HTMLNames::inputTag)
                                 || node->hasTagName(HTMLNames::textareaTag)) {
@@ -2964,7 +2965,7 @@ bool CacheBuilder::validNode(Frame* startFrame, void* matchFrame,
                     return false;
                 return true;
             }
-            node = node->traverseNextNode();
+            node = node->traverseNextNodeFastPath();
         }
         DBG_NAV_LOGD("frame=%p valid node=%p invalid\n", matchFrame, matchNode);
         return false;
@@ -3082,7 +3083,7 @@ bool CacheBuilder::ConstructPartRects(Node* node, const IntRect& bounds,
                     return false;
                 *imageCountPtr += 1;
                 continue;
-            } 
+            }
             if (hasClip == false) {
                 if (nodeIsAnchor && test->hasTagName(HTMLNames::divTag)) {
                     IntRect bounds = renderer->absoluteBoundingBoxRect();  // x, y fixup done by AddPartRect
@@ -3107,7 +3108,7 @@ bool CacheBuilder::ConstructPartRects(Node* node, const IntRect& bounds,
             clip.mBounds = renderer->absoluteBoundingBoxRect(); // x, y fixup done by ConstructTextRect
             clip.mLastChild = OneAfter(lastChild);
             clip.mNode = test;
-        } while (test != last && (test = test->traverseNextNode()) != NULL);
+        } while (test != last && (test = test->traverseNextNodeFastPath()) != NULL);
     }
     if (result->size() == 0 || focusBounds->width() < MINIMUM_FOCUSABLE_WIDTH
             || focusBounds->height() < MINIMUM_FOCUSABLE_HEIGHT) {
@@ -3185,7 +3186,7 @@ bool CacheBuilder::ConstructTextRects(Text* node, int start,
         do {
             if (node == last)
                 return true;
-            node = (Text*) node->traverseNextNode();
+            node = (Text*) node->traverseNextNodeFastPath();
             ASSERT(node != NULL);
         } while (node->isTextNode() == false || node->renderer() == NULL);
     } while (true);
