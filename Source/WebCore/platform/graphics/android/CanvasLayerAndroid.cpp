@@ -54,6 +54,7 @@ WTF::Mutex CanvasLayerAndroid::s_mutex;
 std::map<uint32_t, int> CanvasLayerAndroid::s_texture_usage;
 std::list<int> CanvasLayerAndroid::s_canvas_oom;
 int CanvasLayerAndroid::s_maxTextureThreshold = 1;     //Aggressive collection of resources
+std::map<int, IntSize> CanvasLayerAndroid::s_canvas_dimensions;
 
 std::map<int, SkPicture> CanvasLayerAndroid::s_picture_map;
 std::map<int, SkBitmap> CanvasLayerAndroid::s_bitmap_map;
@@ -97,6 +98,7 @@ void CanvasLayerAndroid::cleanupAssets()
         //Got canvas id -- delete skpicture and bitmap associated with this canvas
         std::map<int, SkPicture>::iterator pic_it = s_picture_map.find(canvas_id);
         std::map<int, SkBitmap>::iterator bmp_it = s_bitmap_map.find(canvas_id);
+        std::map<int, IntSize>::iterator dim_it = s_canvas_dimensions.find(canvas_id);
         if(pic_it != s_picture_map.end())
         {
             s_picture_map.erase(canvas_id);
@@ -104,6 +106,10 @@ void CanvasLayerAndroid::cleanupAssets()
         if(bmp_it != s_bitmap_map.end())
         {
             s_bitmap_map.erase(canvas_id);
+        }
+        if(dim_it != s_canvas_dimensions.end())
+        {
+            s_canvas_dimensions.erase(canvas_id);
         }
 
         //Get generation ids
@@ -225,13 +231,14 @@ void CanvasLayerAndroid::cleanupUnusedAssets(std::vector<uint32_t>& deleteIds)
     }
 }
 
-void CanvasLayerAndroid::setPicture(SkPicture& picture)
+void CanvasLayerAndroid::setPicture(SkPicture& picture, IntSize& size)
 {
     MutexLocker locker(s_mutex);
 
     std::map<int, SkPicture>::iterator pic_it = s_picture_map.find(m_canvas_id);
     std::map<int, SkBitmap>::iterator bmp_it = s_bitmap_map.find(m_canvas_id);
-    if(pic_it == s_picture_map.end() || bmp_it == s_bitmap_map.end())
+    std::map<int, IntSize>::iterator dim_it = s_canvas_dimensions.find(m_canvas_id);
+    if(pic_it == s_picture_map.end() || bmp_it == s_bitmap_map.end() || dim_it == s_canvas_dimensions.end())
     {
         //Create a picture
         SkPicture currentPicture;
@@ -248,6 +255,8 @@ void CanvasLayerAndroid::setPicture(SkPicture& picture)
         }
         s_bitmap_map.insert(std::make_pair(m_canvas_id, bitmap));
 
+        s_canvas_dimensions.insert(std::make_pair(m_canvas_id, size));
+
     }
     else
     {
@@ -262,6 +271,10 @@ void CanvasLayerAndroid::setPicture(SkPicture& picture)
             bitmap.setConfig(SkBitmap::kARGB_8888_Config, currentPicture.width(), currentPicture.height());
             bitmap.allocPixels();
         }
+
+        IntSize& currentSize = dim_it->second;
+        currentSize.setWidth(size.width());
+        currentSize.setHeight(size.height());
     }
 }
 
@@ -296,11 +309,13 @@ bool CanvasLayerAndroid::drawGL()
     MutexLocker locker(s_mutex);
     std::map<int, SkPicture>::iterator pic_it = s_picture_map.find(m_canvas_id);
     std::map<int, SkBitmap>::iterator bmp_it = s_bitmap_map.find(m_canvas_id);
-    if(pic_it == s_picture_map.end() || bmp_it == s_bitmap_map.end())
+    std::map<int, IntSize>::iterator dim_it = s_canvas_dimensions.find(m_canvas_id);
+    if(pic_it == s_picture_map.end() || bmp_it == s_bitmap_map.end() || dim_it == s_canvas_dimensions.end())
         return drawChildrenGL();
 
     SkBitmap& currentBitmap = bmp_it->second;
     SkPicture& currentPicture = pic_it->second;
+    IntSize& currentSize = dim_it->second;
 
     SkAltCanvas canvas(currentBitmap);
     if(currentBitmap.isNull() || currentBitmap.empty())
@@ -414,6 +429,9 @@ bool CanvasLayerAndroid::drawGL()
         s_shader.setScale(TilesManager::instance()->shader()->getScale());
         s_shader.setRepositionMatrix(TilesManager::instance()->shader()->getRepositionMatrix());
         s_shader.setWebViewMatrix(TilesManager::instance()->shader()->getWebViewMatrix());
+
+        FloatRect clippingRect = TilesManager::instance()->shader()->rectInScreenCoord(m_drawTransform, currentSize);
+        TilesManager::instance()->shader()->clip(clippingRect);
 
         std::map<int, std::vector<SkRect> > primitives_map;
         std::map<int, std::vector<FloatRect> > primTexCoord_map;
