@@ -1,5 +1,5 @@
 /*
-Copyright (c) 2011, Code Aurora Forum. All rights reserved.
+Copyright (c) 2012, Code Aurora Forum. All rights reserved.
 
 Redistribution and use in source and binary forms, with or without
 modification, are permitted provided that the following conditions are
@@ -57,9 +57,6 @@ public:
     virtual bool drawGL();
 
     void setPicture(SkPicture& picture);
-    SkPicture getPicture() const  {   return m_currentPicture;    }
-    void setRect(const IntRect& r)    {   m_r = r; }
-    IntRect getRect() const  {   return m_r; }
 
     void setCanvasID(int& id)   {   m_canvas_id = id;   }
     int getCanvasID()   {   return m_canvas_id; }
@@ -73,12 +70,8 @@ protected:
     SkBitmap ScaleBitmap(SkBitmap src, float sx, float sy);
 
 private:
-    SkPicture m_currentPicture;
-    SkBitmap m_currentBitmap;
-    IntRect m_r;
     int m_width, m_height;
     int m_canvas_id;
-    WTF::Mutex m_mutex;
 
     static WTF::Mutex s_mutex;
 
@@ -89,6 +82,10 @@ private:
     static std::map<uint32_t, GLuint> s_texture_map2;
     static std::map<uint32_t, int> s_width_map;
     static std::map<uint32_t, int> s_height_map;
+
+    static std::map<int, SkPicture> s_picture_map;
+    static std::map<int, SkBitmap> s_bitmap_map;
+
     static int s_maxTextureSize;
 
     //Texture Management

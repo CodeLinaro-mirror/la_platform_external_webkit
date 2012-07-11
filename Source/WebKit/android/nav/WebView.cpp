@@ -61,6 +61,7 @@
 #include "WebRequestContext.h"
 #include "WebViewCore.h"
 #include "android_graphics.h"
+#include "HTMLCanvasElement.h"
 
 #ifdef GET_NATIVE_VIEW
 #undef GET_NATIVE_VIEW
@@ -462,6 +463,7 @@ bool drawGL(WebCore::IntRect& viewRect, WebCore::IntRect* invalRect,
         WebCore::IntRect& webViewRect, int titleBarHeight,
         WebCore::IntRect& clip, float scale, int extras)
 {
+    HTMLCanvasElement::setGLEnabled(true);
 #if USE(ACCELERATED_COMPOSITING)
     if (!m_baseLayer || inFullScreenMode())
         return false;
@@ -541,6 +543,7 @@ bool drawGL(WebCore::IntRect& viewRect, WebCore::IntRect* invalRect,
 
 PictureSet* draw(SkCanvas* canvas, SkColor bgColor, int extras, bool split)
 {
+    HTMLCanvasElement::setGLEnabled(false);
     PictureSet* ret = 0;
     if (!m_baseLayer) {
         canvas->drawColor(bgColor);
