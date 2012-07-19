@@ -401,6 +401,11 @@ void HTMLCanvasElement::paint(GraphicsContext* context, const IntRect& r)
     if (is3D())
         static_cast<WebGLRenderingContext*>(m_context.get())->markLayerComposited();
 #endif
+#if ENABLE(DASHBOARD_SUPPORT)
+    Settings* settings = document()->settings();
+    if (settings && settings->usesDashboardBackwardCompatibilityMode())
+        setIeForbidsInsertHTML();
+#endif
 }
 
 #if PLATFORM(ANDROID)
