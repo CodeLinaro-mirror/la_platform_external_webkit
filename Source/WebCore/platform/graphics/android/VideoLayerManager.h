@@ -1,5 +1,6 @@
 /*
  * Copyright 2011 The Android Open Source Project
+ * Copyright (c) 2012, Code Aurora Forum. All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions
@@ -34,13 +35,17 @@
 
 namespace WebCore {
 
+static const size_t surfaceMatrixSize = 4 * 4;
+
 // Every video layer can use its uniqueId to query VideoLayerManager about such
 // info globally.
 struct VideoLayerInfo {
     GLuint textureId; // GL texture bound with the surface texture.
     int videoSize; // The size of the video.
     int timeStamp; // Used to decide which VideoLayerInfo is the oldest one.
-    GLfloat surfaceMatrix[16];
+    GLfloat surfaceMatrix[surfaceMatrixSize];
+    bool matrixInitialized;
+    bool canBeRecycled;
 };
 
 
@@ -53,6 +58,8 @@ public:
 
     // Register the texture when we got setSurfaceTexture call.
     void registerTexture(const int layerId, const GLuint textureId);
+    // Mark this texture to be eligible for recycling if needed
+    void markTextureForRecycling(const int layerId, const GLuint textureId);
     // Update the size when the video is prepared.
     void updateVideoLayerSize(const int layerId, const int size);
     // At draw time, update the matrix for every video frame update.

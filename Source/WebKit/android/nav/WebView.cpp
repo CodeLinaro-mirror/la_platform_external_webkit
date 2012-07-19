@@ -2791,6 +2791,16 @@ static void nativeSetPauseDrawing(JNIEnv *env, jobject obj, jint nativeView,
     ((WebView*)nativeView)->m_isDrawingPaused = pause;
 }
 
+static bool nativeShouldSuspendVideosInBackgroundTab(JNIEnv*, jobject ob)
+{
+#ifdef WEBVIEW_SUSPEND_VIDEOS_IN_BACKGROUND_TAB
+    return true;
+#else
+    return false;
+#endif
+
+}
+
 /*
  * JNI registration
  */
@@ -3007,6 +3017,8 @@ static JNINativeMethod gJavaWebViewMethods[] = {
         (void*) nativeOnTrimMemory },
     { "nativeSetPauseDrawing", "(IZ)V",
         (void*) nativeSetPauseDrawing },
+    { "nativeShouldSuspendVideosInBackgroundTab", "()Z",
+        (void*) nativeShouldSuspendVideosInBackgroundTab},
 };
 
 int registerWebView(JNIEnv* env)

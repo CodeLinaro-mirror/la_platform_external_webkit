@@ -94,7 +94,8 @@ void VideoLayerAndroid::setSurfaceTexture(sp<SurfaceTexture> texture,
 {
     m_surfaceTexture = texture;
     m_playerState = playerState;
-    TilesManager::instance()->videoLayerManager()->registerTexture(uniqueId(), textureName);
+    XLOG("[%08x] setSurfaceTexture layerId %d textureName %d playerstate %d", this,
+            uniqueId(), textureName, m_playerState);
 }
 
 void VideoLayerAndroid::registerVideoLayerObserver(VideoLayerObserverInterface* observer)
@@ -207,36 +208,34 @@ bool VideoLayerAndroid::drawGL()
 
     SkRect rect = SkRect::MakeSize(getSize());
 
-    // Draw the poster image, the progressing image or the Video depending
-    // on the player's state.
-    if (m_playerState == PREPARING) {
-        SkRect innerRect = SkRect(buttonRect);
-        if (calculateInnerRectBounds(rect, innerRect)) {
-            // Show spinner while preparing, with grey background
-            TilesManager::instance()->shader()->drawLayerQuad(m_drawTransform, rect,
-                                                              m_backgroundTextureId,
-                                                              1, true);
-            showProgressSpinner(innerRect);
-        }
-    } else if (((m_playerState == PLAYING) || (m_playerState == BUFFERING)) && m_surfaceTexture.get()) {
-        GLfloat surfaceMatrix[16];
+    if (((m_playerState == PREPARED) || (m_playerState == PLAYING) || (m_playerState == BUFFERING)) && m_surfaceTexture.get()) {
         // Show the real video.
+        GLfloat surfaceMatrix[surfaceMatrixSize];
         m_surfaceTexture->updateTexImage();
         m_surfaceTexture->getTransformMatrix(surfaceMatrix);
         GLuint textureId =
             TilesManager::instance()->videoLayerManager()->getTextureId(uniqueId());
-        TilesManager::instance()->shader()->drawVideoLayerQuad(m_drawTransform,
-                                                               surfaceMatrix,
-                                                               rect, textureId);
-        if (m_playerState == BUFFERING) {
-            SkRect innerRect = SkRect(buttonRect);
-            if (calculateInnerRectBounds(rect, innerRect)) {
-                // Show the spinner on top of the video texture
-                showProgressSpinner(innerRect);
+
+        if (textureId) {
+            TilesManager::instance()->shader()->drawVideoLayerQuad(m_drawTransform,
+                                                                   surfaceMatrix,
+                                                                   rect, textureId);
+            if (m_playerState == BUFFERING) {
+                SkRect innerRect = SkRect(buttonRect);
+                if (calculateInnerRectBounds(rect, innerRect)) {
+                    // Show the spinner on top of the video texture
+                    showProgressSpinner(innerRect);
+                }
             }
+
+            TilesManager::instance()->videoLayerManager()->updateMatrix(uniqueId(),
+                                                                        surfaceMatrix);
+        } else {
+            // This can happen if the video texture is freed by the VideoLayerManager
+            // when the video memory usage exceeds the maximum specified.
+            // See VideoLayerManager::updateVideoLayerSize()
+            XLOG("Warning: VideoLayerAndroid with layerId %d has lost its GL texture", uniqueId());
         }
-        TilesManager::instance()->videoLayerManager()->updateMatrix(uniqueId(),
-                                                                    surfaceMatrix);
     } else {
         GLuint textureId =
             TilesManager::instance()->videoLayerManager()->getTextureId(uniqueId());
@@ -254,9 +253,20 @@ bool VideoLayerAndroid::drawGL()
                 TilesManager::instance()->shader()->drawLayerQuad(m_drawTransform, rect,
                                                                   m_backgroundTextureId,
                                                                   1, true);
-                TilesManager::instance()->shader()->drawLayerQuad(m_drawTransform, innerRect,
-                                                                  m_posterTextureId,
-                                                                  1, true);
+                if (m_playerState != PREPARING) {
+                    TilesManager::instance()->shader()->drawLayerQuad(m_drawTransform, innerRect,
+                                                                 m_posterTextureId,
+                                                                 1, true);
+                }
+            }
+        }
+
+        // Overlay the progress spinner over the video or the default background
+        if (m_playerState == PREPARING) {
+            SkRect innerRect = SkRect(buttonRect);
+            if (calculateInnerRectBounds(rect, innerRect)) {
+                // Show spinner while preparing
+                showProgressSpinner(innerRect);
             }
         }
     }

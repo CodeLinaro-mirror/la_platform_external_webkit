@@ -780,6 +780,13 @@ static bool SendSurfaceTexture(JNIEnv* env, jobject obj, jobject surfTex,
         player = reinterpret_cast<WebCore::MediaPlayerPrivate*>(pointer);
         VideoLayerAndroid* videoLayer = static_cast<VideoLayerAndroid*>(player->platformLayer());
         videoLayer->setPlayerState(static_cast<PlayerState>(playerState));
+        if (playerState == RELEASED) {
+            TilesManager::instance()->videoLayerManager()->markTextureForRecycling(
+                    videoLayer->uniqueId(), textureName);
+        } else {
+            TilesManager::instance()->videoLayerManager()->registerTexture(
+                    videoLayer->uniqueId(), textureName);
+        }
     }
 
     if (!surfTex)
