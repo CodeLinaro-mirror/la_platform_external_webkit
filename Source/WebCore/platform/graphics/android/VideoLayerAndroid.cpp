@@ -64,28 +64,28 @@ android::Mutex videoLayerObserverLock;
 
 VideoLayerAndroid::VideoLayerAndroid()
     : LayerAndroid((RenderLayer*)0)
+    , m_playerState(INITIALIZED)
+    , m_observer(NULL)
 {
-    init();
 }
 
 VideoLayerAndroid::VideoLayerAndroid(const VideoLayerAndroid& layer)
     : LayerAndroid(layer)
-{
-    init();
-}
-
-void VideoLayerAndroid::init()
+    , m_observer(NULL)
 {
     // m_surfaceTexture is only useful on UI thread, no need to copy.
     // And it will be set at setBaseLayer timeframe
-    m_playerState = INITIALIZED;
-    m_observer = NULL;
+    m_playerState = layer.m_playerState;
 }
 
 VideoLayerAndroid::~VideoLayerAndroid()
 {
     android::Mutex::Autolock lock(videoLayerObserverLock);
     SkSafeUnref(m_observer);
+}
+
+void VideoLayerAndroid::setPlayerState(PlayerState state) {
+    m_playerState = state;
 }
 
 // We can use this function to set the Layer to point to surface texture.
@@ -206,7 +206,6 @@ bool VideoLayerAndroid::drawGL()
     }
 
     SkRect rect = SkRect::MakeSize(getSize());
-    GLfloat surfaceMatrix[16];
 
     // Draw the poster image, the progressing image or the Video depending
     // on the player's state.
@@ -220,6 +219,7 @@ bool VideoLayerAndroid::drawGL()
             showProgressSpinner(innerRect);
         }
     } else if (((m_playerState == PLAYING) || (m_playerState == BUFFERING)) && m_surfaceTexture.get()) {
+        GLfloat surfaceMatrix[16];
         // Show the real video.
         m_surfaceTexture->updateTexImage();
         m_surfaceTexture->getTransformMatrix(surfaceMatrix);
