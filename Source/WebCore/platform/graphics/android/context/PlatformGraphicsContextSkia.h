@@ -33,6 +33,8 @@ namespace WebCore {
 class PlatformGraphicsContextSkia : public PlatformGraphicsContext {
 public:
     PlatformGraphicsContextSkia(SkCanvas* canvas, bool takeCanvasOwnership = false);
+    // Create a recording canvas
+    PlatformGraphicsContextSkia(int width, int height);
     virtual ~PlatformGraphicsContextSkia();
     virtual bool isPaintingDisabled();
     virtual SkCanvas* getCanvas() { return mCanvas; }
@@ -99,6 +101,30 @@ public:
     virtual void strokePath(const Path& pathToStroke);
     virtual void strokeRect(const FloatRect& rect, float lineWidth);
 
+    virtual void convertToNonRecording();
+    virtual void clearRecording();
+    virtual SkPicture* getRecordingPicture() const { return m_picture; }
+
+    // When we detect animation we switch to the recording canvas for better
+    // performance. If JS tries to access the pixels of the canvas, the
+    // recording canvas becomes tainted and must be converted back to a bitmap
+    // backed canvas.
+    // CanvasState represents a directed acyclic graph:
+    // DEFAULT ----> ANIMATION_DETECTED ----> RECORDING ----> DIRTY
+    enum CanvasState {
+        DEFAULT, // SkBitmap backed
+        ANIMATION_DETECTED, // JavaScript clearRect of canvas is occuring at a high enough rate SkBitmap backed
+        RECORDING, // SkPicture backed
+        DIRTY // A pixel readback occured; convert to SkBitmap backed.
+    };
+
+    virtual bool isDefault() const { return m_canvasState == DEFAULT; }
+    virtual bool isAnimating() const { return m_canvasState == ANIMATION_DETECTED; }
+    virtual bool isRecording() const { return m_canvasState == RECORDING; }
+    virtual bool isDirty() const { return m_canvasState == DIRTY; }
+
+    virtual void setIsAnimating();
+
 private:
 
     // shadowsIgnoreTransforms is only true for canvas's ImageBuffer, which will
@@ -109,6 +135,9 @@ private:
 
     SkCanvas* mCanvas;
     bool m_deleteCanvas;
+
+    enum CanvasState m_canvasState;
+    SkPicture* m_picture;
 };
 
 }

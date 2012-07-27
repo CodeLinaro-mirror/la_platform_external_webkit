@@ -141,6 +141,17 @@ public:
     virtual SkCanvas* recordingCanvas() = 0;
     virtual void endRecording(int type = 0) = 0;
 
+    virtual void convertToNonRecording() {}
+    virtual void clearRecording() {}
+    virtual SkPicture* getRecordingPicture() const { return NULL; }
+
+    virtual bool isDefault() const { return true; }
+    virtual bool isAnimating() const { return false; }
+    virtual bool isRecording() const { return false; }
+    virtual bool isDirty() const {return false; }
+
+    virtual void setIsAnimating() {}
+
 protected:
 
     struct ShadowRec {
