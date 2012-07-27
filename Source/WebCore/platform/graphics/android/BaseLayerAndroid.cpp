@@ -258,8 +258,7 @@ bool BaseLayerAndroid::prepareBasePictureInGL(SkRect& viewport, float scale,
 
     // If we fired a request, let's check if it's ready to use
     if (zoomManager->didFireRequest()) {
-        if (nextTiledPage->swapBuffersIfReady(viewportTileBounds,
-                                              zoomManager->futureScale()))
+        if (nextTiledPage->swapBuffersIfReady(viewportTileBounds, prepareNextTiledPage ? scale : zoomManager->futureScale()))
             zoomManager->setReceivedRequest(); // transition to received request state
     }
 
