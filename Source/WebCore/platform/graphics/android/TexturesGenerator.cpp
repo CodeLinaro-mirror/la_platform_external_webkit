@@ -65,6 +65,11 @@ void TexturesGenerator::removeOperationsForPage(TiledPage* page)
     removeOperationsForFilter(new PageFilter(page));
 }
 
+void TexturesGenerator::removeOperationsForSurface(SurfacePainter* surface)
+{
+    removeOperationsForFilter(new SurfaceFilter(surface));
+}
+
 void TexturesGenerator::removePaintOperationsForPage(TiledPage* page, bool waitForRunning)
 {
     removeOperationsForFilter(new PagePaintFilter(page), waitForRunning);

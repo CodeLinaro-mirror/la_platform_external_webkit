@@ -33,12 +33,13 @@
 namespace WebCore {
 
 PaintTileOperation::PaintTileOperation(BaseTile* tile, SurfacePainter* surface)
-    : QueuedOperation(QueuedOperation::PaintTile, tile->page())
+    : QueuedOperation(QueuedOperation::PaintTile, tile->page(), surface)
     , m_tile(tile)
     , m_surface(surface)
 {
     if (m_tile)
         m_tile->setRepaintPending(true);
+
     SkSafeRef(m_surface);
 }
 
