@@ -55,6 +55,7 @@ public:
     void setSize(const IntSize& size);
     SurfaceTextureClient* nativeWindow();
     bool uploadImageBuffer(ImageBuffer* imageBuffer);
+    bool uploadImageBitmap(SkBitmap* bitmap);
     bool hasValidTexture() { return m_hasValidTexture; }
 
     /********************************************
