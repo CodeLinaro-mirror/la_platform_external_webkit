@@ -39,13 +39,6 @@ class SurfaceTexture;
 
 namespace WebCore {
 
-// state get from UI thread to decide which image to draw.
-// PREPARING should be the progressing image
-// PLAYING will be the Video (Surface Texture).
-// Otherwise will draw a static image.
-// NOTE: These values are matching the ones in HTML5VideoView.java
-// Please keep them in sync when changed here.
-typedef enum {INITIALIZED, PREPARING, PREPARED, PLAYING, BUFFERING, RELEASED} PlayerState;
 
 class VideoLayerObserverInterface : public SkRefCnt {
 public:
@@ -66,9 +59,8 @@ public:
 
     // The following functions are called in UI thread only.
     virtual bool drawGL(bool layerTilesDisabled);
-    void setSurfaceTexture(sp<SurfaceTexture> texture, int textureName, PlayerState playerState);
+    void setSurfaceTexture(sp<SurfaceTexture> texture, int textureName);
     virtual bool needsIsolatedSurface() { return true; }
-    void setPlayerState(PlayerState state);
     void registerVideoLayerObserver(VideoLayerObserverInterface* observer);
 private:
     void init();
@@ -77,8 +69,6 @@ private:
     // Surface texture for showing the video is actually allocated in Java side
     // and passed into this native code.
     sp<android::SurfaceTexture> m_surfaceTexture;
-
-    PlayerState m_playerState;
 
     static double m_rotateDegree;
 
