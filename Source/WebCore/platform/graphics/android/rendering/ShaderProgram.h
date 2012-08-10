@@ -139,6 +139,8 @@ public:
                                 const IntSize& size);
     FloatRect rectInViewCoord(const TransformationMatrix& drawMatrix,
                                 const IntSize& size);
+    FloatRect rectInViewCoord(const TransformationMatrix& drawMatrix,
+                                const FloatRect& rect);
 
     FloatRect rectInViewCoord(const FloatRect& rect);
     FloatRect rectInInvViewCoord(const FloatRect& rect);

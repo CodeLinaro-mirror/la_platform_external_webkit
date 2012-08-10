@@ -47,7 +47,6 @@ android::Mutex videoLayerObserverLock;
 
 VideoLayerAndroid::VideoLayerAndroid()
     : LayerAndroid((RenderLayer*)0)
-    , m_playerState(INITIALIZED)
     , m_observer(NULL)
 {
 }
@@ -58,7 +57,6 @@ VideoLayerAndroid::VideoLayerAndroid(const VideoLayerAndroid& layer)
 {
     // m_surfaceTexture is only useful on UI thread, no need to copy.
     // And it will be set at setBaseLayer timeframe
-    m_playerState = layer.m_playerState;
 }
 
 VideoLayerAndroid::~VideoLayerAndroid()
@@ -67,16 +65,11 @@ VideoLayerAndroid::~VideoLayerAndroid()
     SkSafeUnref(m_observer);
 }
 
-void VideoLayerAndroid::setPlayerState(PlayerState state) {
-    m_playerState = state;
-}
-
 // We can use this function to set the Layer to point to surface texture.
 void VideoLayerAndroid::setSurfaceTexture(sp<SurfaceTexture> texture,
-                                          int textureName, PlayerState playerState)
+                                          int textureName)
 {
     m_surfaceTexture = texture;
-    m_playerState = playerState;
     TilesManager::instance()->videoLayerManager()->registerTexture(uniqueId(), textureName);
 }
 
@@ -139,6 +132,8 @@ bool VideoLayerAndroid::drawGL(bool layerTilesDisabled)
     // Lazily allocated the textures.
     TilesManager* tilesManager = TilesManager::instance();
     VideoLayerManager* manager = tilesManager->videoLayerManager();
+    PlayerState playerState = manager->getPlayerState(uniqueId());
+
     manager->initGLResourcesIfNeeded();
 
     ShaderProgram* shader = tilesManager->shader();
@@ -169,12 +164,14 @@ bool VideoLayerAndroid::drawGL(bool layerTilesDisabled)
     // When we are drawing the animation of the play/pause button in the
     // middle of the video, we need to ask for redraw.
     bool needRedraw = false;
+
     TextureQuadData iconQuadData(0, GL_TEXTURE_2D, GL_LINEAR, LayerQuad,
                                  &m_drawTransform, &innerRect);
-    // Draw the poster image, the progressing image or the Video depending
+
+    // Draw the poster image, the progressing image or the video depending
     // on the player's state.
-    if ((m_playerState == PREPARED || m_playerState == PLAYING
-            || m_playerState == BUFFERING) && m_surfaceTexture.get()) {
+    if ((playerState == PREPARED || playerState == PLAYING
+            || playerState == BUFFERING) && m_surfaceTexture.get()) {
         // Show the real video.
         m_surfaceTexture->updateTexImage();
         m_surfaceTexture->getTransformMatrix(surfaceMatrix);
@@ -183,20 +180,20 @@ bool VideoLayerAndroid::drawGL(bool layerTilesDisabled)
                                    videoRect, textureId);
         manager->updateMatrix(uniqueId(), surfaceMatrix);
 
-        IconType iconType = (m_playerState == PREPARED) ? PauseIcon : PlayIcon;
+        IconType iconType = (playerState == PREPARED) ? PauseIcon : PlayIcon;
         // Use the scale to control the fading the sizing during animation
         double scale = manager->drawIcon(uniqueId(), iconType);
         if (scale) {
             innerRect.inset(manager->getButtonSize() / 4 * scale,
                             manager->getButtonSize() / 4 * scale);
-            if (m_playerState == PREPARED)
+            if (playerState == PREPARED)
                 iconQuadData.updateTextureId(manager->getPauseTextureId());
             else
                 iconQuadData.updateTextureId(manager->getPlayTextureId());
             iconQuadData.updateOpacity(scale);
             shader->drawQuad(&iconQuadData);
             needRedraw = true;
-        } else if (m_playerState == BUFFERING) {
+        } else if (playerState == BUFFERING) {
             // Show the spinner on top of the video texture
             showProgressSpinner(innerRect);
             needRedraw = true;
@@ -204,7 +201,7 @@ bool VideoLayerAndroid::drawGL(bool layerTilesDisabled)
     } else {
         GLuint textureId = manager->getTextureId(uniqueId());
         GLfloat* matrix = manager->getMatrix(uniqueId());
-        if (textureId && matrix) {
+        if (playerState != DETACHED && textureId && matrix) {
             // Show the screen shot for each video.
             shader->drawVideoLayerQuad(m_drawTransform, matrix,
                                        videoRect, textureId);
@@ -214,14 +211,14 @@ bool VideoLayerAndroid::drawGL(bool layerTilesDisabled)
             shader->drawQuad(&pureColorQuadData);
 
             // Draw static poster image
-            if (m_playerState != PREPARING) {
+            if (playerState != PREPARING) {
                 iconQuadData.updateTextureId(manager->getPosterTextureId());
                 iconQuadData.updateOpacity(1.0);
                 shader->drawQuad(&iconQuadData);
             }
         }
 
-        if (m_playerState == PREPARING) {
+        if (playerState == PREPARING) {
             // Show the progressing animation, with two rotating circles
             showProgressSpinner(innerRect);
             needRedraw = true;
@@ -229,8 +226,7 @@ bool VideoLayerAndroid::drawGL(bool layerTilesDisabled)
     }
 
     if (m_observer) {
-        IntSize size(videoRect.width(), videoRect.height());
-        m_observer->notifyRectChange(TilesManager::instance()->shader()->rectInViewCoord(m_drawTransform, size));
+        m_observer->notifyRectChange(TilesManager::instance()->shader()->rectInViewCoord(m_drawTransform, FloatRect(videoRect)));
     }
 
     return needRedraw;

@@ -172,6 +172,16 @@ float VideoLayerManager::getAspectRatio(const int layerId)
     return result;
 }
 
+// Getting the video PlayerState, in the UI thread
+PlayerState VideoLayerManager::getPlayerState(const int layerId)
+{
+    android::Mutex::Autolock lock(m_videoLayerInfoMapLock);
+    PlayerState result = RELEASED;
+    if (m_videoLayerInfoMap.contains(layerId))
+        result = m_videoLayerInfoMap.get(layerId)->playerState;
+    return result;
+}
+
 // Getting matrix for GL draw call, in the UI thread.
 GLfloat* VideoLayerManager::getMatrix(const int layerId)
 {
@@ -209,15 +219,17 @@ void VideoLayerManager::registerTexture(const int layerId, const GLuint textureI
     if (pPreviousInfo == NULL) {
         memset(pInfo->surfaceMatrix, 0, sizeof(pInfo->surfaceMatrix));
         pInfo->matrixInitialized = false;
+        pInfo->videoSize = 0;
+        pInfo->aspectRatio = DEFAULT_VIDEO_ASPECT_RATIO;
     } else {
         // Need the previous surface matrix to composite the new texture
         memcpy(pInfo->surfaceMatrix, pPreviousInfo->surfaceMatrix, sizeof(pInfo->surfaceMatrix));
         pInfo->matrixInitialized = true;
+        pInfo->videoSize = pPreviousInfo->videoSize;
+        pInfo->aspectRatio = pPreviousInfo->aspectRatio;
         // Can now delete the previous entry
         removeLayerInternal(layerId);
     }
-    pInfo->videoSize = 0;
-    pInfo->aspectRatio = DEFAULT_VIDEO_ASPECT_RATIO;
     m_currentTimeStamp++;
     pInfo->timeStamp = m_currentTimeStamp;
     pInfo->canBeRecycled = false;
@@ -252,6 +264,16 @@ void VideoLayerManager::updateVideoLayerSize(const int layerId, const int size,
         if (!recycleTextureMem())
             break;
     return;
+}
+
+// This is called only from UI thread, at drawGL time.
+void VideoLayerManager::updatePlayerState(const int layerId, const PlayerState playerState)
+{
+    android::Mutex::Autolock lock(m_videoLayerInfoMapLock);
+    if (m_videoLayerInfoMap.contains(layerId)) {
+        VideoLayerInfo* pInfo = m_videoLayerInfoMap.get(layerId);
+        pInfo->playerState = playerState;
+    }
 }
 
 // This is called only from UI thread, at drawGL time.
@@ -335,7 +357,7 @@ void VideoLayerManager::deleteUnusedTextures()
             }
         }
         glDeleteTextures(size, textureNames);
-        delete textureNames;
+        delete[] textureNames;
         m_retiredTextures.clear();
     }
     m_retiredTexturesLock.unlock();
