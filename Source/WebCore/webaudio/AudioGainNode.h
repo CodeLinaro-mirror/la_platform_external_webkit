@@ -39,7 +39,7 @@ class AudioContext;
 
 class AudioGainNode : public AudioNode {
 public:
-    static PassRefPtr<AudioGainNode> create(AudioContext* context, double sampleRate)
+    static PassRefPtr<AudioGainNode> create(AudioContext* context, float sampleRate)
     {
         return adoptRef(new AudioGainNode(context, sampleRate));      
     }
@@ -55,14 +55,12 @@ public:
     AudioGain* gain() { return m_gain.get(); }                                   
     
 private:
-    AudioGainNode(AudioContext*, double sampleRate);
+    AudioGainNode(AudioContext*, float sampleRate);
 
-    double m_lastGain; // for de-zippering
+    float m_lastGain; // for de-zippering
     RefPtr<AudioGain> m_gain;
 
-    // This synchronizes live channel count changes which require an uninitialization / re-initialization.
-    // FIXME: this can go away when we implement optimization for mixing with gain directly in summing junction of AudioNodeInput.
-    mutable Mutex m_processLock;
+    AudioFloatArray m_sampleAccurateGainValues;
 };
 
 } // namespace WebCore

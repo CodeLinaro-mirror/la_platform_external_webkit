@@ -31,8 +31,27 @@
 #include "BiquadDSPKernel.h"
 
 namespace WebCore {
+    
+BiquadProcessor::BiquadProcessor(float sampleRate, size_t numberOfChannels, bool autoInitialize)
+    : AudioDSPKernelProcessor(sampleRate, numberOfChannels)
+    , m_type(LowPass)
+    , m_parameter1(0)
+    , m_parameter2(0)
+    , m_parameter3(0)
+    , m_filterCoefficientsDirty(true)
+{
+    double nyquist = 0.5 * this->sampleRate();
 
-BiquadProcessor::BiquadProcessor(FilterType type, double sampleRate, size_t numberOfChannels, bool autoInitialize)
+    // Create parameters for BiquadFilterNode.
+    m_parameter1 = AudioParam::create("frequency", 350.0, 10.0, nyquist);
+    m_parameter2 = AudioParam::create("Q", 1, 0.0001, 1000.0);
+    m_parameter3 = AudioParam::create("gain", 0.0, -40, 40);
+
+    if (autoInitialize)
+        initialize();
+}
+
+BiquadProcessor::BiquadProcessor(FilterType type, float sampleRate, size_t numberOfChannels, bool autoInitialize)
     : AudioDSPKernelProcessor(sampleRate, numberOfChannels)
     , m_type(type)
     , m_parameter1(0)
@@ -42,35 +61,18 @@ BiquadProcessor::BiquadProcessor(FilterType type, double sampleRate, size_t numb
 {
     double nyquist = 0.5 * this->sampleRate();
     
+    // Handle the deprecated LowPass2FilterNode and HighPass2FilterNode.
     switch (type) {
     // Highpass and lowpass share the same parameters and only differ in filter type.
-    case LowPass2:
-    case HighPass2:
+    case LowPass:
+    case HighPass:
         m_parameter1 = AudioParam::create("frequency", 350.0, 20.0, nyquist);
         m_parameter2 = AudioParam::create("resonance", 0.0, -20.0, 20.0);
         m_parameter3 = AudioParam::create("unused", 0.0, 0.0, 1.0);
         break;
 
-    case Peaking:
-        m_parameter1 = AudioParam::create("frequency", 2500.0, 20.0, nyquist);
-        m_parameter2 = AudioParam::create("gain", 0.0, -20.0, 20.0);
-        m_parameter3 = AudioParam::create("Q", 0.5, 0.0, 1000.0);
-        break;
-    case Allpass:
-        m_parameter1 = AudioParam::create("frequency", 2500.0, 20.0, nyquist);
-        m_parameter2 = AudioParam::create("Q", 0.5, 0.0, 1000.0);
-        m_parameter3 = AudioParam::create("unused", 0.0, 0.0, 1.0);
-        break;
-    case LowShelf:
-        m_parameter1 = AudioParam::create("frequency", 80.0, 20.0, nyquist);
-        m_parameter2 = AudioParam::create("gain", 0.0, 0.0, 1.0);
-        m_parameter3 = AudioParam::create("unused", 0.0, 0.0, 1.0);
-        break;
-    case HighShelf:
-        m_parameter1 = AudioParam::create("frequency", 10000.0, 20.0, nyquist);
-        m_parameter2 = AudioParam::create("gain", 0.0, 0.0, 1.0);
-        m_parameter3 = AudioParam::create("unused", 0.0, 0.0, 1.0);
-        break;
+    default:
+        ASSERT_NOT_REACHED();
     }
 
     if (autoInitialize)
@@ -88,14 +90,10 @@ PassOwnPtr<AudioDSPKernel> BiquadProcessor::createKernel()
     return adoptPtr(new BiquadDSPKernel(this));
 }
 
-void BiquadProcessor::process(AudioBus* source, AudioBus* destination, size_t framesToProcess)
+void BiquadProcessor::checkForDirtyCoefficients()
 {
-    if (!isInitialized()) {
-        destination->zero();
-        return;
-    }
-        
-    // Deal with smoothing / de-zippering.  Start out assuming filter parameters are not changing.
+    // Deal with smoothing / de-zippering. Start out assuming filter parameters are not changing.
+
     // The BiquadDSPKernel objects rely on this value to see if they need to re-compute their internal filter coefficients.
     m_filterCoefficientsDirty = false;
     
@@ -107,17 +105,49 @@ void BiquadProcessor::process(AudioBus* source, AudioBus* destination, size_t fr
         m_filterCoefficientsDirty = true;
         m_hasJustReset = false;
     } else {
-        // Smooth all of the filter parameters.  If they haven't yet converged to their target value then mark coefficients as dirty.
+        // Smooth all of the filter parameters. If they haven't yet converged to their target value then mark coefficients as dirty.
         bool isStable1 = m_parameter1->smooth();
         bool isStable2 = m_parameter2->smooth();
         bool isStable3 = m_parameter3->smooth();
         if (!(isStable1 && isStable2 && isStable3))
             m_filterCoefficientsDirty = true;
     }
+}
+
+void BiquadProcessor::process(const AudioBus* source, AudioBus* destination, size_t framesToProcess)
+{
+    if (!isInitialized()) {
+        destination->zero();
+        return;
+    }
         
+    checkForDirtyCoefficients();
+            
     // For each channel of our input, process using the corresponding BiquadDSPKernel into the output channel.
     for (unsigned i = 0; i < m_kernels.size(); ++i)
-        m_kernels[i]->process(source->channel(i)->data(), destination->channel(i)->data(), framesToProcess);
+        m_kernels[i]->process(source->channel(i)->data(), destination->channel(i)->mutableData(), framesToProcess);
+}
+
+void BiquadProcessor::setType(FilterType type)
+{
+    if (type != m_type) {
+        m_type = type;
+        reset(); // The filter state must be reset only if the type has changed.
+    }
+}
+
+void BiquadProcessor::getFrequencyResponse(int nFrequencies,
+                                           const float* frequencyHz,
+                                           float* magResponse,
+                                           float* phaseResponse)
+{
+    // Compute the frequency response on a separate temporary kernel
+    // to avoid interfering with the processing running in the audio
+    // thread on the main kernels.
+    
+    OwnPtr<BiquadDSPKernel> responseKernel = adoptPtr(new BiquadDSPKernel(this));
+
+    responseKernel->getFrequencyResponse(nFrequencies, frequencyHz, magResponse, phaseResponse);
 }
 
 } // namespace WebCore
