@@ -1,5 +1,6 @@
 /*
  * Copyright (C) 2007, 2008, 2009, 2010, 2011 Apple Inc. All rights reserved.
+ * Copyright (c) 2012, The Linux Foundation. All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions
@@ -190,6 +191,7 @@ public:
     enum MediaElementType { Video, Audio };
     void setMediaElementType(MediaElementType type) { m_mediaElementType = type; }
     MediaElementType mediaElementType() { return m_mediaElementType; }
+    String getMimeType() const { return m_contentMIMEType; };
 #endif
 
     void setFrameView(FrameView* frameView) { m_frameView = frameView; }
