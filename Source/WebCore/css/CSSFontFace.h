@@ -65,7 +65,7 @@ public:
     void fontLoaded(CSSFontFaceSource*);
     void retireCustomFont(SimpleFontData*);
 
-    SimpleFontData* getFontData(const FontDescription&, bool syntheticBold, bool syntheticItalic);
+    SimpleFontData* getFontData(const FontDescription&, bool syntheticBold, bool syntheticItalic, bool woffEnabled);
 
     struct UnicodeRange {
         UnicodeRange(UChar32 from, UChar32 to)
