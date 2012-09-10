@@ -656,6 +656,7 @@ LOCAL_SRC_FILES := $(LOCAL_SRC_FILES) \
 	platform/graphics/SimpleFontData.cpp \
 	platform/graphics/StringTruncator.cpp \
 	platform/graphics/WidthIterator.cpp \
+	platform/graphics/WOFFFileFormat.cpp \
 	\
 	platform/graphics/android/BitmapAllocatorAndroid.cpp \
 	platform/graphics/android/GraphicsLayerAndroid.cpp \
