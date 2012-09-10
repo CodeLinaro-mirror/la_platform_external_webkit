@@ -136,6 +136,7 @@ struct FieldIds {
         mSyntheticLinksEnabled = env->GetFieldID(clazz, "mSyntheticLinksEnabled", "Z");
         mUseDoubleTree = env->GetFieldID(clazz, "mUseDoubleTree", "Z");
         mPageCacheCapacity = env->GetFieldID(clazz, "mPageCacheCapacity", "I");
+        mWOFFEnabled = env->GetFieldID(clazz, "mWOFFEnabled", "Z");
 #if ENABLE(WEBGL)
         mWebGLEnabled = env->GetFieldID(clazz, "mWebGLEnabled", "Z");
 #endif
@@ -202,6 +203,7 @@ struct FieldIds {
         ALOG_ASSERT(mUseDoubleTree, "Could not find field mUseDoubleTree");
         ALOG_ASSERT(mPageCacheCapacity, "Could not find field mPageCacheCapacity");
         ALOG_ASSERT(mPasswordEchoEnabled, "Could not find field mPasswordEchoEnabled");
+        ALOG_ASSERT(mWOFFEnabled, "Could not find field mWOFFEnabled");
 #if ENABLE(WEBGL)
         ALOG_ASSERT(mWebGLEnabled, "Could not find field mWebGLEnabled");
 #endif
@@ -256,6 +258,7 @@ struct FieldIds {
     jfieldID mSyntheticLinksEnabled;
     jfieldID mUseDoubleTree;
     jfieldID mPageCacheCapacity;
+    jfieldID mWOFFEnabled;
 #if ENABLE(WEBGL)
     jfieldID mWebGLEnabled;
 #endif
@@ -597,6 +600,9 @@ public:
             WebCore::pageCache()->setCapacity(size);
         } else
             s->setUsesPageCache(false);
+
+        flag = env->GetBooleanField(obj, gFieldIds->mWOFFEnabled);
+        s->setWOFFEnabled(flag);
 
 #if ENABLE(WEBGL)
         flag = env->GetBooleanField(obj, gFieldIds->mWebGLEnabled);
