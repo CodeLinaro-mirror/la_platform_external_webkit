@@ -57,6 +57,7 @@
 #if PLATFORM(ANDROID)
 #include <cutils/log.h>
 #include <cutils/properties.h>
+#include "CanvasLayer.h"
 #endif
 
 #if USE(JSC)
@@ -78,7 +79,6 @@ static const int DefaultHeight = 150;
 
 #if PLATFORM(ANDROID)
 //TODO::VA::Make this robust later (prototyping)... needs to be protected by ifdefs for android
-int HTMLCanvasElement::s_canvas_id = 0;
 int HTMLCanvasElement::s_recordingCanvasThreshold = 5;
 #endif
 
@@ -121,8 +121,6 @@ HTMLCanvasElement::HTMLCanvasElement(const QualifiedName& tagName, Document* doc
     ASSERT(hasTagName(canvasTag));
 
 # if PLATFORM(ANDROID)
-    m_canvasLayer = new CanvasLayerAndroid();
-
     char pval[PROPERTY_VALUE_MAX];
     property_get("debug.recordingcanvas", pval, "1");
 
@@ -138,11 +136,6 @@ HTMLCanvasElement::HTMLCanvasElement(const QualifiedName& tagName, Document* doc
     property_get("debug.recordingcanvas.threshold", pval3, "5");
 
     s_recordingCanvasThreshold = atoi(pval3);
-
-    //Set the canvas ID
-    SLOGD("++++++++++++++++++++++Setting up the canvas ID to be %d", s_canvas_id);
-    m_canvasLayer->setCanvasID(s_canvas_id);
-    ++s_canvas_id;
 #endif
 }
 
@@ -163,10 +156,10 @@ HTMLCanvasElement::~HTMLCanvasElement()
         (*it)->canvasDestroyed(this);
 
 #if PLATFORM(ANDROID)
-    int id = m_canvasLayer->getCanvasID();
-    CanvasLayerAndroid::markGLAssetsForRemoval(id);
-    delete m_canvasLayer;
-    SLOGD("++++++++++++++++ Deleting the canvas with id %d", id);
+#if ENABLE(WEBGL)
+    document()->unregisterForDocumentActivationCallbacks(this);
+    document()->unregisterForDocumentSuspendCallbacks(this);
+#endif
 #endif
 }
 
@@ -378,14 +371,6 @@ void HTMLCanvasElement::paint(GraphicsContext* context, const IntRect& r)
 }
 
 #if PLATFORM(ANDROID)
-CanvasLayerAndroid* HTMLCanvasElement::gpuCanvasLayer()
-{
-    if(m_canvasLayer)
-        return m_canvasLayer;
-
-    return NULL;
-}
-
 bool HTMLCanvasElement::canUseGpuRendering()
 {
     return (m_supportedCompositing && m_gpuCanvasEnabled);
@@ -555,7 +540,6 @@ void HTMLCanvasElement::enableGpuRendering()
         return;
 
     m_gpuRendering = true;
-    m_canvasLayer->setGpuCanvasStatus(true);
 }
 
 void HTMLCanvasElement::disableGpuRendering()
@@ -564,7 +548,6 @@ void HTMLCanvasElement::disableGpuRendering()
         return;
 
     m_gpuRendering = false;
-    m_canvasLayer->setGpuCanvasStatus(false);
 }
 
 void HTMLCanvasElement::clearRecording(const FloatRect& rect)
@@ -579,11 +562,16 @@ void HTMLCanvasElement::clearRecording(const FloatRect& rect)
             {
                 //gpu canvas path
                 IntRect r(rect.x(), rect.y(), rect.width(), rect.height());
-                m_imageBuffer->copyRecordingToLayer(NULL, r, m_canvasLayer);
+                GraphicsContext* ctx = drawingContext();
+                if(ctx)
+                {
+                    CanvasLayer::copyRecordingToLayer(ctx, r, m_canvasId);
+                }
             }
             else
             {
                 disableGpuRendering();
+                CanvasLayer::setGpuCanvasStatus(m_canvasId, false);
             }
         }
         m_imageBuffer->clearRecording();
