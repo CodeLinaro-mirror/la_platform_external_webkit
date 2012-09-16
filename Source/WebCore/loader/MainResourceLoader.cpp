@@ -1,7 +1,7 @@
 /*
  * Copyright (C) 2006, 2007, 2008, 2009 Apple Inc. All rights reserved.
  * Copyright (C) 2008 Torch Mobile Inc. All rights reserved. (http://www.torchmobile.com/)
- * Copyright (c) 2011, 2012 Code Aurora Forum. All rights reserved
+ * Copyright (c) 2011, 2012 The Linux Foundation. All rights reserved
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions
@@ -483,7 +483,11 @@ void MainResourceLoader::didFinishLoading(double finishTime)
     dl->applicationCacheHost()->finishedLoadingMainResource();
 #endif
 
-    StatHubMainUrlLoaded(url().string().latin1().data());
+    StatHubCmd* cmd = StatHubCmdCreate(SH_CMD_WK_MAIN_URL, SH_ACTION_DID_FINISH);
+    if (NULL!=cmd) {
+        StatHubCmdAddParamAsString(cmd, url().string().latin1().data());
+        StatHubCmdCommit(cmd);
+    }
 }
 
 void MainResourceLoader::didFail(const ResourceError& error)
