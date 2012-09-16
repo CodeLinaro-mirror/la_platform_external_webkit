@@ -490,12 +490,11 @@ WebFrame::loadStarted(WebCore::Frame* frame)
     WebCore::FrameLoadType loadType = frame->loader()->loadType();
 
     if (isMainFrame) {
-        StatHubCmd(INPUT_CMD_WK_START_PAGE_LOAD, (void*)url.string().utf8().data(), strlen( url.string().utf8().data())+1, (void*)frame, 0);
-        if (true == mCloseUnusedSocketsEnabled) {
-            if (false == mPageLoadStarted) {
-                gPageLoadCounter++;
-                mPageLoadStarted = true;
-            }
+        StatHubCmd* cmd = StatHubCmdCreate(SH_CMD_WK_PAGE, SH_ACTION_WILL_START_LOAD);
+        if (NULL!=cmd) {
+            StatHubCmdAddParamAsString(cmd, url.string().utf8().data());
+            StatHubCmdAddParamAsUint32(cmd, (unsigned int)frame);
+            StatHubCmdCommit(cmd);
         }
     }
 
@@ -577,7 +576,12 @@ WebFrame::didFinishLoad(WebCore::Frame* frame)
     env->DeleteLocalRef(urlStr);
 
     if (isMainFrame) {
-        StatHubCmd(INPUT_CMD_WK_FINISH_PAGE_LOAD, (void*)url.string().utf8().data(), strlen( url.string().utf8().data())+1, (void*)frame, 0);
+        StatHubCmd* cmd = StatHubCmdCreate(SH_CMD_WK_PAGE, SH_ACTION_DID_FINISH_LOAD);
+        if (NULL!=cmd) {
+            StatHubCmdAddParamAsString(cmd, url.string().utf8().data());
+            StatHubCmdAddParamAsUint32(cmd, (unsigned int)frame);
+            StatHubCmdCommit(cmd);
+        }
         if (true == mCloseUnusedSocketsEnabled) {
             if ((gPageLoadCounter > 0) && (true == mPageLoadStarted)) {
                 mPageLoadStarted = false;
