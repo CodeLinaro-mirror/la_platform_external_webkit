@@ -68,6 +68,11 @@ public:
         m_pixmapsGenerationThread->removeOperationsForPage(page);
     }
 
+    void removeOperationsForSurface(SurfacePainter* surface)
+    {
+        m_pixmapsGenerationThread->removeOperationsForSurface(surface);
+    }
+
     void removePaintOperationsForPage(TiledPage* page, bool waitForCompletion)
     {
         m_pixmapsGenerationThread->removePaintOperationsForPage(page, waitForCompletion);

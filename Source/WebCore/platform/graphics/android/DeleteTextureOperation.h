@@ -34,7 +34,7 @@ namespace WebCore {
 class DeleteTextureOperation : public QueuedOperation {
 public:
     DeleteTextureOperation(GLuint textureId, EGLImageKHR eglImage)
-        : QueuedOperation(QueuedOperation::DeleteTexture, 0)
+        : QueuedOperation(QueuedOperation::DeleteTexture, 0, 0)
         , m_textureId(textureId)
         , m_eglImage(eglImage) {}
     virtual bool operator==(const QueuedOperation* operation)

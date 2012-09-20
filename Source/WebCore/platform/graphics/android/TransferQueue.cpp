@@ -36,6 +36,8 @@
 
 #include <cutils/log.h>
 #include <wtf/text/CString.h>
+
+#undef XLOGC
 #define XLOGC(...) android_printLog(ANDROID_LOG_DEBUG, "TransferQueue", __VA_ARGS__)
 
 #ifdef DEBUG

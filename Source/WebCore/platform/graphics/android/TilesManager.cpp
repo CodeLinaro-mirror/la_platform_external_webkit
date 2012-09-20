@@ -477,6 +477,8 @@ void TilesManager::paintedSurfacesCleanup(GLWebViewState* state)
     for (unsigned int i = 0; i < collect.size(); i++) {
         PaintedSurface* surface = collect[i];
         m_paintedSurfaces.remove(m_paintedSurfaces.find(surface));
+        XLOGC("Removing surface 0x%x", surface);
+        removeOperationsForSurface(surface);
         SkSafeUnref(surface);
     }
 }

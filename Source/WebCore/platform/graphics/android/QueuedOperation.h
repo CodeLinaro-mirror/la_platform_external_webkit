@@ -26,25 +26,35 @@
 #ifndef QueuedOperation_h
 #define QueuedOperation_h
 
+#include <cutils/log.h>
+#include <wtf/text/CString.h>
+
+#undef XLOGC
+#define XLOGC(...) android_printLog(ANDROID_LOG_DEBUG, "QueuedOperation", __VA_ARGS__)
+
 namespace WebCore {
 
 class TiledPage;
+class SurfacePainter;
 
 class QueuedOperation {
 public:
     enum OperationType { Undefined, PaintTile, PaintLayer, DeleteTexture };
-    QueuedOperation(OperationType type, TiledPage* page)
+    QueuedOperation(OperationType type, TiledPage* page, SurfacePainter* surface)
         : m_type(type)
-        , m_page(page) {}
-    virtual ~QueuedOperation() {}
+        , m_page(page)
+        , m_surface(surface) {}
+    virtual ~QueuedOperation() { }
     virtual void run() = 0;
     virtual bool operator==(const QueuedOperation* operation) = 0;
     virtual int priority() { return -1; }
     OperationType type() const { return m_type; }
     TiledPage* page() const { return m_page; }
+    SurfacePainter* surface() const { return m_surface; }
 private:
     OperationType m_type;
     TiledPage* m_page;
+    SurfacePainter* m_surface;
 };
 
 class OperationFilter {
@@ -64,6 +74,21 @@ public:
     }
 private:
     TiledPage* m_page;
+};
+
+class SurfaceFilter : public OperationFilter {
+public:
+    SurfaceFilter(SurfacePainter* surface) : m_surface(surface) {}
+    virtual bool check(QueuedOperation* operation)
+    {
+        if (operation->surface() == m_surface) {
+            XLOGC("Removing operation 0x%x for surface = 0x%x", operation, m_surface);
+            return true;
+        }
+        return false;
+    }
+private:
+    SurfacePainter* m_surface;
 };
 
 class PagePaintFilter : public OperationFilter {
