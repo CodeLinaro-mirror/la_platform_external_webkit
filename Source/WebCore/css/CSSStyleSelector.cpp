@@ -4408,7 +4408,7 @@ void CSSStyleSelector::applyProperty(int id, CSSValue *value)
             lineHeight = Length(-100.0, Percent);
         else if (CSSPrimitiveValue::isUnitTypeLength(type)) {
             double multiplier = zoomFactor;
-            if (m_style->textSizeAdjust()) {
+            if (m_style->textSizeAdjust() && !m_style->fontDescription().isAbsoluteSize()) {
                 if (Frame* frame = m_checker.m_document->frame())
                     multiplier *= frame->textZoomFactor();
             }
