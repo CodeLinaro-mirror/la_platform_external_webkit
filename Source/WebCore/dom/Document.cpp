@@ -7,7 +7,7 @@
  * Copyright (C) 2008, 2009 Torch Mobile Inc. All rights reserved. (http://www.torchmobile.com/)
  * Copyright (C) 2008, 2009 Google Inc. All rights reserved.
  * Copyright (C) 2010 Nokia Corporation and/or its subsidiary(-ies)
- * Copyright (c) 2011, 2012 Code Aurora Forum. All rights reserved
+ * Copyright (c) 2011, 2012 The Linux Foundation. All rights reserved
  * Copyright (C) 2011, 2012 Sony Ericsson Mobile Communications AB
  * Copyright (C) 2012 Sony Mobile Communcations AB
  *
@@ -2344,7 +2344,11 @@ static void updateDocumentUrl(const KURL& url) {
     unsigned short main_url_len = url.string().length();
 
     if (main_url_len && url.protocolInHTTPFamily()) {
-        StatHubUpdateMainUrl(url.string().latin1().data());
+        StatHubCmd* cmd = StatHubCmdCreate(SH_CMD_WK_MAIN_URL, SH_ACTION_WILL_START);
+        if (NULL!=cmd) {
+            StatHubCmdAddParamAsString(cmd, url.string().latin1().data());
+            StatHubCmdCommit(cmd);
+        }
     }
 }
 

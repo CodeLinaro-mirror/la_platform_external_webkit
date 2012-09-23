@@ -1,6 +1,6 @@
 /*
  * Copyright (C) 2010 Google, Inc. All Rights Reserved.
- * Copyright (c) 2011, 2012 Code Aurora Forum. All rights reserved
+ * Copyright (c) 2011, 2012 The Linux Foundation. All rights reserved
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions
@@ -322,9 +322,12 @@ void HTMLScriptRunner::runScript(Element* script, const TextPosition1& scriptSta
             requestParsingBlockingScript(script);
             // updating JS execution
             m_document->incrementNumExternalJs();
-            StatHubCmd(INPUT_CMD_WK_JS_SEQ,
-                       (void*) currentUrl.latin1().data(), currentUrl.length()+1,
-                       (void*) m_document->getNumExternalJs(), 0);
+            StatHubCmd* cmd = StatHubCmdCreate(SH_CMD_WK_RESOURCE, SH_ACTION_JS_SEQ);
+            if (NULL!=cmd) {
+                StatHubCmdAddParamAsString(cmd, currentUrl.latin1().data());
+                StatHubCmdAddParamAsUint32(cmd, m_document->getNumExternalJs());
+                StatHubCmdCommit(cmd);
+            }
         }
     }
 }
