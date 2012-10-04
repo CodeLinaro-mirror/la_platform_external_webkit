@@ -596,8 +596,13 @@ FloatRect ShaderProgram::rectInInvViewCoord(const TransformationMatrix& drawMatr
 FloatRect ShaderProgram::rectInViewCoord(const TransformationMatrix& drawMatrix, const IntSize& size)
 {
     FloatRect srect(0, 0, size.width(), size.height());
+    return rectInViewCoord(drawMatrix, srect);
+}
+
+FloatRect ShaderProgram::rectInViewCoord(const TransformationMatrix& drawMatrix, const FloatRect& rect)
+{
     TransformationMatrix renderMatrix = m_contentToViewMatrix * drawMatrix;
-    return renderMatrix.mapRect(srect);
+    return renderMatrix.mapRect(rect);
 }
 
 FloatRect ShaderProgram::rectInViewCoord(const FloatRect& rect)
