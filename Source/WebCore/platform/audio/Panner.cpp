@@ -38,7 +38,7 @@
 
 namespace WebCore {
 
-PassOwnPtr<Panner> Panner::create(PanningModel model, float sampleRate)
+PassOwnPtr<Panner> Panner::create(PanningModel model, double sampleRate)
 {
     OwnPtr<Panner> panner;
 
@@ -55,7 +55,7 @@ PassOwnPtr<Panner> Panner::create(PanningModel model, float sampleRate)
     case PanningModelSoundField:
     default:
         ASSERT_NOT_REACHED();
-        return nullptr;
+        return 0;
     }
 
     return panner.release();

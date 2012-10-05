@@ -30,14 +30,11 @@
 
 namespace WebCore {
 
-LowPass2FilterNode::LowPass2FilterNode(AudioContext* context, float sampleRate)
+LowPass2FilterNode::LowPass2FilterNode(AudioContext* context, double sampleRate)
     : AudioBasicProcessorNode(context, sampleRate)
 {
-    m_processor = adoptPtr(new BiquadProcessor(BiquadProcessor::LowPass, sampleRate, 1, false));
-    biquadProcessor()->parameter1()->setContext(context);
-    biquadProcessor()->parameter2()->setContext(context);
-    biquadProcessor()->parameter3()->setContext(context);
-    setNodeType(NodeTypeLowPass2Filter);
+    m_processor = adoptPtr(new BiquadProcessor(BiquadProcessor::LowPass2, sampleRate, 1, false));
+    setType(NodeTypeLowPass2Filter);
 }
 
 } // namespace WebCore

@@ -146,12 +146,6 @@ public:
     void clearMediaCacheForSite(const String&) { }
 
     virtual void setPrivateBrowsingMode(bool) { }
-
-
-#if ENABLE(WEB_AUDIO)
-    virtual AudioSourceProvider* audioSourceProvider() { return 0; }
-#endif
-
 };
 
 }

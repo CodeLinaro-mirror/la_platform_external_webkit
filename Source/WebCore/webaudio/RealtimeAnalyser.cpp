@@ -32,13 +32,16 @@
 #include "AudioUtilities.h"
 #include "FFTFrame.h"
 
+#if ENABLE(WEBGL)
+#include "Float32Array.h"
+#include "Uint8Array.h"
+#endif
+
 #include <algorithm>
 #include <limits.h>
 #include <wtf/Complex.h>
-#include "Float32Array.h"
-#include <wtf/MainThread.h>
 #include <wtf/MathExtras.h>
-#include "Uint8Array.h"
+#include <wtf/Threading.h>
 
 using namespace std;
 
@@ -49,8 +52,6 @@ const double RealtimeAnalyser::DefaultMinDecibels = -100.0;
 const double RealtimeAnalyser::DefaultMaxDecibels = -30.0;
 
 const unsigned RealtimeAnalyser::DefaultFFTSize = 2048;
-// All FFT implementations are expected to handle power-of-two sizes MinFFTSize <= size <= MaxFFTSize.
-const unsigned RealtimeAnalyser::MinFFTSize = 128;
 const unsigned RealtimeAnalyser::MaxFFTSize = 2048;
 const unsigned RealtimeAnalyser::InputBufferSize = RealtimeAnalyser::MaxFFTSize * 2;
 
@@ -84,16 +85,15 @@ void RealtimeAnalyser::setFftSize(size_t size)
     // Only allow powers of two.
     unsigned log2size = static_cast<unsigned>(log2(size));
     bool isPOT(1UL << log2size == size);
-
-    if (!isPOT || size > MaxFFTSize || size < MinFFTSize) {
+    
+    if (!isPOT || size > MaxFFTSize) {
         // FIXME: It would be good to also set an exception.
         return;
     }
 
     if (m_fftSize != size) {
-        m_analysisFrame = adoptPtr(new FFTFrame(size));
-        // m_magnitudeBuffer has size = fftSize / 2 because it contains floats reduced from complex values in m_analysisFrame.
-        m_magnitudeBuffer.allocate(size / 2);
+        m_analysisFrame = adoptPtr(new FFTFrame(m_fftSize));
+        m_magnitudeBuffer.resize(size);
         m_fftSize = size;
     }
 }
@@ -113,7 +113,7 @@ void RealtimeAnalyser::writeInput(AudioBus* bus, size_t framesToProcess)
     
     // Perform real-time analysis
     // FIXME : for now just use left channel (must mix if stereo source)
-    const float* source = bus->channel(0)->data();
+    float* source = bus->channel(0)->data();
 
     // The source has already been sanity checked with isBusGood above.
     
@@ -157,19 +157,18 @@ void RealtimeAnalyser::doFFTAnalysis()
     float* tempP = temporaryBuffer.data();
 
     // Take the previous fftSize values from the input buffer and copy into the temporary buffer.
+    // FIXME : optimize with memcpy().
     unsigned writeIndex = m_writeIndex;
-    if (writeIndex < fftSize) {
-        memcpy(tempP, inputBuffer + writeIndex - fftSize + InputBufferSize, sizeof(*tempP) * (fftSize - writeIndex));
-        memcpy(tempP + fftSize - writeIndex, inputBuffer, sizeof(*tempP) * writeIndex);
-    } else 
-        memcpy(tempP, inputBuffer + writeIndex - fftSize, sizeof(*tempP) * fftSize);
-
+    for (unsigned i = 0; i < fftSize; ++i)
+        tempP[i] = inputBuffer[(i + writeIndex - fftSize + InputBufferSize) % InputBufferSize];
     
     // Window the input samples.
     applyWindow(tempP, fftSize);
     
     // Do the analysis.
     m_analysisFrame->doFFT(tempP);
+
+    size_t n = DefaultFFTSize / 2;
 
     float* realP = m_analysisFrame->realData();
     float* imagP = m_analysisFrame->imagData();
@@ -187,13 +186,14 @@ void RealtimeAnalyser::doFFTAnalysis()
     
     // Convert the analysis data from complex to magnitude and average with the previous result.
     float* destination = magnitudeBuffer().data();
-    size_t n = magnitudeBuffer().size();
-    for (size_t i = 0; i < n; ++i) {
+    for (unsigned i = 0; i < n; ++i) {
         Complex c(realP[i], imagP[i]);
         double scalarMagnitude = abs(c) * MagnitudeScale;        
         destination[i] = float(k * destination[i] + (1.0 - k) * scalarMagnitude);
     }
 }
+
+#if ENABLE(WEBGL)
 
 void RealtimeAnalyser::getFloatFrequencyData(Float32Array* destinationArray)
 {
@@ -293,6 +293,8 @@ void RealtimeAnalyser::getByteTimeDomainData(Uint8Array* destinationArray)
         }
     }
 }
+
+#endif // WEBGL
 
 } // namespace WebCore
 

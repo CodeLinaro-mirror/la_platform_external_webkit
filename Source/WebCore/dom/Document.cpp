@@ -228,11 +228,6 @@
 #include "ScriptedAnimationController.h"
 #endif
 
-#if ENABLE(WEB_AUDIO)
-#include "AudioProcessingEvent.h"
-#include "OfflineAudioCompletionEvent.h"
-#endif
-
 using namespace std;
 using namespace WTF;
 using namespace Unicode;
@@ -3645,12 +3640,6 @@ PassRefPtr<Event> Document::createEvent(const String& eventType, ExceptionCode& 
         event = WebKitTransitionEvent::create();
     else if (eventType == "WheelEvent")
         event = WheelEvent::create();
-#if ENABLE(WEB_AUDIO)
-    else if (eventType == "AudioProcessingEvent")
-        event = AudioProcessingEvent::create();
-    else if (eventType == "OfflineAudioCompletionEvent")
-        event = OfflineAudioCompletionEvent::create();
-#endif
 #if ENABLE(SVG)
     else if (eventType == "SVGEvents")
         event = Event::create();

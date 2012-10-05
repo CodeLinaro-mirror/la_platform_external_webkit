@@ -43,7 +43,7 @@ namespace WebCore {
 
 using namespace VectorMath;
 
-ReverbConvolverStage::ReverbConvolverStage(const float* impulseResponse, size_t responseLength, size_t reverbTotalLatency, size_t stageOffset, size_t stageLength,
+ReverbConvolverStage::ReverbConvolverStage(float* impulseResponse, size_t responseLength, size_t reverbTotalLatency, size_t stageOffset, size_t stageLength,
                                            size_t fftSize, size_t renderPhase, size_t renderSliceSize, ReverbAccumulationBuffer* accumulationBuffer)
     : m_fftKernel(fftSize)
     , m_accumulationBuffer(accumulationBuffer)
@@ -56,7 +56,7 @@ ReverbConvolverStage::ReverbConvolverStage(const float* impulseResponse, size_t 
     
     m_fftKernel.doPaddedFFT(impulseResponse + stageOffset, stageLength);
     m_convolver = adoptPtr(new FFTConvolver(fftSize));
-    m_temporaryBuffer.allocate(renderSliceSize);
+    m_temporaryBuffer.resize(renderSliceSize);
 
     // The convolution stage at offset stageOffset needs to have a corresponding delay to cancel out the offset.
     size_t totalDelay = stageOffset + reverbTotalLatency;
@@ -78,7 +78,7 @@ ReverbConvolverStage::ReverbConvolverStage(const float* impulseResponse, size_t 
     m_preReadWriteIndex = 0;
     m_framesProcessed = 0; // total frames processed so far
 
-    m_preDelayBuffer.allocate(m_preDelayLength < fftSize ? fftSize : m_preDelayLength);
+    m_preDelayBuffer.resize(m_preDelayLength < fftSize ? fftSize : m_preDelayLength);
 }
 
 void ReverbConvolverStage::processInBackground(ReverbConvolver* convolver, size_t framesToProcess)
@@ -88,7 +88,7 @@ void ReverbConvolverStage::processInBackground(ReverbConvolver* convolver, size_
     process(source, framesToProcess);
 }
 
-void ReverbConvolverStage::process(const float* source, size_t framesToProcess)
+void ReverbConvolverStage::process(float* source, size_t framesToProcess)
 {
     ASSERT(source);
     if (!source)
@@ -96,8 +96,7 @@ void ReverbConvolverStage::process(const float* source, size_t framesToProcess)
     
     // Deal with pre-delay stream : note special handling of zero delay.
 
-    const float* preDelayedSource;
-    float* preDelayedDestination;
+    float* preDelayedSource;
     float* temporaryBuffer;
     bool isTemporaryBufferSafe = false;
     if (m_preDelayLength > 0) {
@@ -109,12 +108,10 @@ void ReverbConvolverStage::process(const float* source, size_t framesToProcess)
 
         isTemporaryBufferSafe = framesToProcess <= m_temporaryBuffer.size();
 
-        preDelayedDestination = m_preDelayBuffer.data() + m_preReadWriteIndex;
-        preDelayedSource = preDelayedDestination;
+        preDelayedSource = m_preDelayBuffer.data() + m_preReadWriteIndex;
         temporaryBuffer = m_temporaryBuffer.data();        
     } else {
         // Zero delay
-        preDelayedDestination = 0;
         preDelayedSource = source;
         temporaryBuffer = m_preDelayBuffer.data();
         
@@ -124,6 +121,8 @@ void ReverbConvolverStage::process(const float* source, size_t framesToProcess)
     ASSERT(isTemporaryBufferSafe);
     if (!isTemporaryBufferSafe)
         return;
+
+    int writeIndex = 0;
 
     if (m_framesProcessed < m_preDelayLength) {
         // For the first m_preDelayLength frames don't process the convolver, instead simply buffer in the pre-delay.
@@ -136,12 +135,12 @@ void ReverbConvolverStage::process(const float* source, size_t framesToProcess)
         m_convolver->process(&m_fftKernel, preDelayedSource, temporaryBuffer, framesToProcess);
 
         // Now accumulate into reverb's accumulation buffer.
-        m_accumulationBuffer->accumulate(temporaryBuffer, framesToProcess, &m_accumulationReadIndex, m_postDelayLength);
+        writeIndex = m_accumulationBuffer->accumulate(temporaryBuffer, framesToProcess, &m_accumulationReadIndex, m_postDelayLength);
     }
 
     // Finally copy input to pre-delay.
     if (m_preDelayLength > 0) {
-        memcpy(preDelayedDestination, source, sizeof(float) * framesToProcess);
+        memcpy(preDelayedSource, source, sizeof(float) * framesToProcess);
         m_preReadWriteIndex += framesToProcess;
 
         ASSERT(m_preReadWriteIndex <= m_preDelayLength);

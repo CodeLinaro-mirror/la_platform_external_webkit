@@ -71,14 +71,13 @@ public:
     AudioChannel* channel(unsigned channel) { return m_channels[channel].get(); }
     const AudioChannel* channel(unsigned channel) const { return const_cast<AudioBus*>(this)->m_channels[channel].get(); }
     AudioChannel* channelByType(unsigned type);
-    const AudioChannel* channelByType(unsigned type) const;
 
     // Number of sample-frames
     size_t length() const { return m_length; }
 
     // Sample-rate : 0.0 if unknown or "don't care"
-    float sampleRate() const { return m_sampleRate; }
-    void setSampleRate(float sampleRate) { m_sampleRate = sampleRate; }
+    double sampleRate() const { return m_sampleRate; }
+    void setSampleRate(double sampleRate) { m_sampleRate = sampleRate; }
 
     // Zeroes all channels.
     void zero();
@@ -88,24 +87,26 @@ public:
 
     // Creates a new buffer from a range in the source buffer.
     // 0 may be returned if the range does not fit in the sourceBuffer
-    static PassOwnPtr<AudioBus> createBufferFromRange(const AudioBus* sourceBuffer, unsigned startFrame, unsigned endFrame);
+    static PassOwnPtr<AudioBus> createBufferFromRange(AudioBus* sourceBuffer, unsigned startFrame, unsigned endFrame);
 
 
+#if !PLATFORM(MAC)
     // Creates a new AudioBus by sample-rate converting sourceBus to the newSampleRate.
     // setSampleRate() must have been previously called on sourceBus.
     // Note: sample-rate conversion is already handled in the file-reading code for the mac port, so we don't need this.
-    static PassOwnPtr<AudioBus> createBySampleRateConverting(const AudioBus* sourceBus, bool mixToMono, double newSampleRate);
+    static PassOwnPtr<AudioBus> createBySampleRateConverting(AudioBus* sourceBus, bool mixToMono, double newSampleRate);
+#endif
 
     // Creates a new AudioBus by mixing all the channels down to mono.
     // If sourceBus is already mono, then the returned AudioBus will simply be a copy.
-    static PassOwnPtr<AudioBus> createByMixingToMono(const AudioBus* sourceBus);
+    static PassOwnPtr<AudioBus> createByMixingToMono(AudioBus* sourceBus);
 
     // Scales all samples by the same amount.
-    void scale(float scale);
+    void scale(double scale);
 
     // Master gain for this bus - used with sumWithGainFrom() below
-    void setGain(float gain) { m_busGain = gain; }
-    float gain() const { return m_busGain; }
+    void setGain(double gain) { m_busGain = gain; }
+    double gain() { return m_busGain; }
 
     void reset() { m_isFirstTime = true; } // for de-zippering
 
@@ -120,11 +121,8 @@ public:
     // We scale by targetGain (and our own internal gain m_busGain), performing "de-zippering" to smoothly change from *lastMixGain to (targetGain*m_busGain).
     // The caller is responsible for setting up lastMixGain to point to storage which is unique for every "stream" which will be summed to this bus.
     // This represents the dezippering memory.
-    void copyWithGainFrom(const AudioBus &sourceBus, float* lastMixGain, float targetGain);
-    void sumWithGainFrom(const AudioBus &sourceBus, float* lastMixGain, float targetGain);
-
-    // Copies the sourceBus by scaling with sample-accurate gain values.
-    void copyWithSampleAccurateGainValuesFrom(const AudioBus &sourceBus, float* gainValues, unsigned numberOfGainValues);
+    void copyWithGainFrom(const AudioBus &sourceBus, double* lastMixGain, double targetGain);
+    void sumWithGainFrom(const AudioBus &sourceBus, double* lastMixGain, double targetGain);
 
     // Returns maximum absolute value across all channels (useful for normalization).
     float maxAbsValue() const;
@@ -132,13 +130,13 @@ public:
     // Makes maximum absolute value == 1.0 (if possible).
     void normalize();
 
-    static PassOwnPtr<AudioBus> loadPlatformResource(const char* name, float sampleRate);
+    static PassOwnPtr<AudioBus> loadPlatformResource(const char* name, double sampleRate);
 
 protected:
     AudioBus() { };
 
-    void processWithGainFrom(const AudioBus &sourceBus, float* lastMixGain, float targetGain, bool sumToBus);
-    void processWithGainFromMonoStereo(const AudioBus &sourceBus, float* lastMixGain, float targetGain, bool sumToBus);
+    void processWithGainFrom(const AudioBus &sourceBus, double* lastMixGain, double targetGain, bool sumToBus);
+    void processWithGainFromMonoStereo(const AudioBus &sourceBus, double* lastMixGain, double targetGain, bool sumToBus);
 
     size_t m_length;
 
@@ -146,9 +144,9 @@ protected:
 
     int m_layout;
 
-    float m_busGain;
+    double m_busGain;
     bool m_isFirstTime;
-    float m_sampleRate; // 0.0 if unknown or N/A
+    double m_sampleRate; // 0.0 if unknown or N/A
 };
 
 } // WebCore
