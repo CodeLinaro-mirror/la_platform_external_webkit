@@ -32,7 +32,7 @@
 #include "AudioContext.h"
 #include "HRTFDatabaseLoader.h"
 #include <algorithm>
-#include <wtf/MainThread.h>
+#include <wtf/Threading.h>
 
 using namespace std;
  
@@ -43,7 +43,6 @@ const size_t renderQuantumSize = 128;
 OfflineAudioDestinationNode::OfflineAudioDestinationNode(AudioContext* context, AudioBuffer* renderTarget)
     : AudioDestinationNode(context, renderTarget->sampleRate())
     , m_renderTarget(renderTarget)
-    , m_renderThread(0)
     , m_startedRendering(false)
 {
     m_renderBus = adoptPtr(new AudioBus(renderTarget->numberOfChannels(), renderQuantumSize));
@@ -69,11 +68,6 @@ void OfflineAudioDestinationNode::uninitialize()
     if (!isInitialized())
         return;
 
-    if (m_renderThread) {
-        waitForThreadCompletion(m_renderThread, 0);
-        m_renderThread = 0;
-    }
-
     AudioNode::uninitialize();
 }
 
@@ -86,7 +80,6 @@ void OfflineAudioDestinationNode::startRendering()
     
     if (!m_startedRendering) {
         m_startedRendering = true;
-        ref(); // See corresponding deref() call in notifyCompleteDispatch().
         m_renderThread = createThread(OfflineAudioDestinationNode::renderEntry, this, "offline renderer");
     }
 }
@@ -140,7 +133,7 @@ void OfflineAudioDestinationNode::render()
         size_t framesAvailableToCopy = min(framesToProcess, renderQuantumSize);
         
         for (unsigned channelIndex = 0; channelIndex < numberOfChannels; ++channelIndex) {
-            const float* source = m_renderBus->channel(channelIndex)->data();
+            float* source = m_renderBus->channel(channelIndex)->data();
             float* destination = m_renderTarget->getChannelData(channelIndex)->data();
             memcpy(destination + n, source, sizeof(float) * framesAvailableToCopy);
         }
@@ -161,7 +154,6 @@ void OfflineAudioDestinationNode::notifyCompleteDispatch(void* userData)
         return;
 
     destinationNode->notifyComplete();
-    destinationNode->deref();
 }
 
 void OfflineAudioDestinationNode::notifyComplete()

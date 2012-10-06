@@ -33,8 +33,8 @@
 
 using namespace std;
   
-const float DefaultMaxDelayTime = 1;
-const float SmoothingTimeConstant = 0.020f; // 20ms
+const double DefaultMaxDelayTime = 1.0;
+const double SmoothingTimeConstant = 0.020; // 20ms
   
 namespace WebCore {
 
@@ -48,13 +48,13 @@ DelayDSPKernel::DelayDSPKernel(DelayProcessor* processor)
     if (!processor)
         return;
 
-    m_buffer.allocate(static_cast<size_t>(processor->sampleRate() * DefaultMaxDelayTime));
+    m_buffer.resize(static_cast<size_t>(processor->sampleRate() * DefaultMaxDelayTime));
     m_buffer.zero();
 
     m_smoothingRate = AudioUtilities::discreteTimeConstantForSampleRate(SmoothingTimeConstant, processor->sampleRate());
 }
 
-DelayDSPKernel::DelayDSPKernel(double maxDelayTime, float sampleRate)
+DelayDSPKernel::DelayDSPKernel(double maxDelayTime, double sampleRate)
     : AudioDSPKernel(sampleRate)
     , m_maxDelayTime(maxDelayTime)
     , m_writeIndex(0)
@@ -69,7 +69,7 @@ DelayDSPKernel::DelayDSPKernel(double maxDelayTime, float sampleRate)
     if (!bufferLength)
         return;
     
-    m_buffer.allocate(bufferLength);
+    m_buffer.resize(bufferLength);
     m_buffer.zero();
 
     m_smoothingRate = AudioUtilities::discreteTimeConstantForSampleRate(SmoothingTimeConstant, sampleRate);
@@ -88,7 +88,7 @@ void DelayDSPKernel::process(const float* source, float* destination, size_t fra
     if (!source || !destination)
         return;
         
-    float sampleRate = this->sampleRate();
+    double sampleRate = this->sampleRate();
     double delayTime = delayProcessor() ? delayProcessor()->delayTime()->value() : m_desiredDelayFrames / sampleRate;
 
     // Make sure the delay time is in a valid range.
@@ -108,7 +108,7 @@ void DelayDSPKernel::process(const float* source, float* destination, size_t fra
         double desiredDelayFrames = m_currentDelayTime * sampleRate;
 
         double readPosition = m_writeIndex + bufferLength - desiredDelayFrames;
-        if (readPosition >= bufferLength)
+        if (readPosition > bufferLength)
             readPosition -= bufferLength;
 
         // Linearly interpolate in-between delay times.

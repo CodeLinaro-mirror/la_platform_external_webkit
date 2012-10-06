@@ -32,18 +32,16 @@
 #include "AudioContext.h"
 #include "AudioNodeInput.h"
 #include "AudioNodeOutput.h"
-#include "AudioUtilities.h"
-#include "DenormalDisabler.h"
 
 namespace WebCore {
     
-AudioDestinationNode::AudioDestinationNode(AudioContext* context, float sampleRate)
+AudioDestinationNode::AudioDestinationNode(AudioContext* context, double sampleRate)
     : AudioNode(context, sampleRate)
-    , m_currentSampleFrame(0)
+    , m_currentTime(0.0)
 {
     addInput(adoptPtr(new AudioNodeInput(this)));
     
-    setNodeType(NodeTypeDestination);
+    setType(NodeTypeDestination);
 }
 
 AudioDestinationNode::~AudioDestinationNode()
@@ -54,11 +52,6 @@ AudioDestinationNode::~AudioDestinationNode()
 // The audio hardware calls us back here to gets its input stream.
 void AudioDestinationNode::provideInput(AudioBus* destinationBus, size_t numberOfFrames)
 {
-    // We don't want denormals slowing down any of the audio processing
-    // since they can very seriously hurt performance.
-    // This will take care of all AudioNodes because they all process within this scope.
-    DenormalDisabler denormalDisabler;
-    
     context()->setAudioThread(currentThread());
     
     if (!context()->isRunnable()) {
@@ -83,8 +76,8 @@ void AudioDestinationNode::provideInput(AudioBus* destinationBus, size_t numberO
     // Let the context take care of any business at the end of each render quantum.
     context()->handlePostRenderTasks();
     
-    // Advance current sample-frame.
-    m_currentSampleFrame += numberOfFrames;
+    // Advance current time.
+    m_currentTime += numberOfFrames / sampleRate();
 }
 
 } // namespace WebCore

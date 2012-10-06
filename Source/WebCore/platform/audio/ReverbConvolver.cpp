@@ -82,7 +82,7 @@ ReverbConvolver::ReverbConvolver(AudioChannel* impulseResponse, size_t renderSli
     // Otherwise, assume we're being run from a command-line tool.
     bool hasRealtimeConstraint = useBackgroundThreads;
 
-    const float* response = impulseResponse->data();
+    float* response = impulseResponse->data();
     size_t totalResponseLength = impulseResponse->length();
 
     // Because we're not using direct-convolution in the leading portion, the reverb has an overall latency of half the first-stage FFT size
@@ -102,7 +102,7 @@ ReverbConvolver::ReverbConvolver(AudioChannel* impulseResponse, size_t renderSli
         // This "staggers" the time when each FFT happens so they don't all happen at the same time
         int renderPhase = convolverRenderPhase + i * renderSliceSize;
 
-        OwnPtr<ReverbConvolverStage> stage = adoptPtr(new ReverbConvolverStage(response, totalResponseLength, reverbTotalLatency, stageOffset, stageSize, fftSize, renderPhase, renderSliceSize, &m_accumulationBuffer));
+        OwnPtr<ReverbConvolverStage> stage(new ReverbConvolverStage(response, totalResponseLength, reverbTotalLatency, stageOffset, stageSize, fftSize, renderPhase, renderSliceSize, &m_accumulationBuffer));
 
         bool isBackgroundStage = false;
 
@@ -164,26 +164,26 @@ void ReverbConvolver::backgroundThreadEntry()
         // we do this in case we want to run in more than one background thread.
         int readIndex;
 
-        while ((readIndex = m_backgroundStages[0]->inputReadIndex()) != writeIndex && !m_wantsToExit) { // FIXME: do better to detect buffer overrun...
+        while ((readIndex = m_backgroundStages[0]->inputReadIndex()) != writeIndex) { // FIXME: do better to detect buffer overrun...
             // The ReverbConvolverStages need to process in amounts which evenly divide half the FFT size
             const int SliceSize = MinFFTSize / 2;
 
             // Accumulate contributions from each stage
-            for (size_t i = 0; i < m_backgroundStages.size() && !m_wantsToExit; ++i)
+            for (size_t i = 0; i < m_backgroundStages.size(); ++i)
                 m_backgroundStages[i]->processInBackground(this, SliceSize);
         }
     }
 }
 
-void ReverbConvolver::process(const AudioChannel* sourceChannel, AudioChannel* destinationChannel, size_t framesToProcess)
+void ReverbConvolver::process(AudioChannel* sourceChannel, AudioChannel* destinationChannel, size_t framesToProcess)
 {
     bool isSafe = sourceChannel && destinationChannel && sourceChannel->length() >= framesToProcess && destinationChannel->length() >= framesToProcess;
     ASSERT(isSafe);
     if (!isSafe)
         return;
         
-    const float* source = sourceChannel->data();
-    float* destination = destinationChannel->mutableData();
+    float* source = sourceChannel->data();
+    float* destination = destinationChannel->data();
     bool isDataSafe = source && destination;
     ASSERT(isDataSafe);
     if (!isDataSafe)

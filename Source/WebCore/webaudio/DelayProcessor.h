@@ -37,7 +37,7 @@ class AudioDSPKernel;
     
 class DelayProcessor : public AudioDSPKernelProcessor {
 public:
-    DelayProcessor(float sampleRate, unsigned numberOfChannels);
+    DelayProcessor(double sampleRate, unsigned numberOfChannels);
     virtual ~DelayProcessor();
     
     virtual PassOwnPtr<AudioDSPKernel> createKernel();

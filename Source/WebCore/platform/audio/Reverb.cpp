@@ -35,7 +35,6 @@
 #include "AudioBus.h"
 #include "AudioFileReader.h"
 #include "ReverbConvolver.h"
-#include "VectorMath.h"
 #include <math.h>
 #include <wtf/MathExtras.h>
 #include <wtf/OwnPtr.h>
@@ -47,26 +46,28 @@ using namespace std;
 
 namespace WebCore {
 
-using namespace VectorMath;
-
 // Empirical gain calibration tested across many impulse responses to ensure perceived volume is same as dry (unprocessed) signal
-const float GainCalibration = -58;
+const double GainCalibration = -58.0;
 
 // A minimum power value to when normalizing a silent (or very quiet) impulse response
-const float MinPower = 0.000125f;
+const double MinPower = 0.000125;
     
-static float calculateNormalizationScale(AudioBus* response)
+static double calculateNormalizationScale(AudioBus* response)
 {
     // Normalize by RMS power
     size_t numberOfChannels = response->numberOfChannels();
     size_t length = response->length();
 
-    float power = 0;
+    double power = 0.0;
 
     for (size_t i = 0; i < numberOfChannels; ++i) {
-        float channelPower = 0;
-        vsvesq(response->channel(i)->data(), 1, &channelPower, length);
-        power += channelPower;
+        int n = length;
+        float* p = response->channel(i)->data();
+
+        while (n--) {
+            float sample = *p++;
+            power += sample * sample;
+        }
     }
 
     power = sqrt(power / (numberOfChannels * length));
@@ -75,35 +76,28 @@ static float calculateNormalizationScale(AudioBus* response)
     if (isinf(power) || isnan(power) || power < MinPower)
         power = MinPower;
 
-    float scale = 1 / power;
+    double scale = 1.0 / power;
 
-    scale *= powf(10, GainCalibration * 0.05f); // calibrate to make perceived volume same as unprocessed
+    scale *= pow(10.0, GainCalibration * 0.05); // calibrate to make perceived volume same as unprocessed
 
     // True-stereo compensation
     if (response->numberOfChannels() == 4)
-        scale *= 0.5f;
+        scale *= 0.5;
 
     return scale;
 }
 
-Reverb::Reverb(AudioBus* impulseResponse, size_t renderSliceSize, size_t maxFFTSize, size_t numberOfChannels, bool useBackgroundThreads, bool normalize)
+Reverb::Reverb(AudioBus* impulseResponse, size_t renderSliceSize, size_t maxFFTSize, size_t numberOfChannels, bool useBackgroundThreads)
 {
-    float scale = 1;
-
-    if (normalize) {
-        scale = calculateNormalizationScale(impulseResponse);
-
-        if (scale)
-            impulseResponse->scale(scale);
-    }
+    double scale = calculateNormalizationScale(impulseResponse);
+    if (scale)
+        impulseResponse->scale(scale);
 
     initialize(impulseResponse, renderSliceSize, maxFFTSize, numberOfChannels, useBackgroundThreads);
 
-    // Undo scaling since this shouldn't be a destructive operation on impulseResponse.
-    // FIXME: What about roundoff? Perhaps consider making a temporary scaled copy
-    // instead of scaling and unscaling in place.
-    if (normalize && scale)
-        impulseResponse->scale(1 / scale);
+    // Undo scaling since this shouldn't be a destructive operation on impulseResponse
+    if (scale)
+        impulseResponse->scale(1.0 / scale);
 }
 
 void Reverb::initialize(AudioBus* impulseResponseBuffer, size_t renderSliceSize, size_t maxFFTSize, size_t numberOfChannels, bool useBackgroundThreads)
@@ -127,10 +121,10 @@ void Reverb::initialize(AudioBus* impulseResponseBuffer, size_t renderSliceSize,
     // For "True" stereo processing we allocate a temporary buffer to avoid repeatedly allocating it in the process() method.
     // It can be bad to allocate memory in a real-time thread.
     if (numResponseChannels == 4)
-        m_tempBuffer = adoptPtr(new AudioBus(2, MaxFrameSize));
+        m_tempBuffer = new AudioBus(2, MaxFrameSize);
 }
 
-void Reverb::process(const AudioBus* sourceBus, AudioBus* destinationBus, size_t framesToProcess)
+void Reverb::process(AudioBus* sourceBus, AudioBus* destinationBus, size_t framesToProcess)
 {
     // Do a fairly comprehensive sanity check.
     // If these conditions are satisfied, all of the source and destination pointers will be valid for the various matrixing cases.
@@ -148,7 +142,7 @@ void Reverb::process(const AudioBus* sourceBus, AudioBus* destinationBus, size_t
     }
 
     AudioChannel* destinationChannelL = destinationBus->channel(0);
-    const AudioChannel* sourceChannelL = sourceBus->channel(0);
+    AudioChannel* sourceChannelL = sourceBus->channel(0);
 
     // Handle input -> output matrixing...
     size_t numInputChannels = sourceBus->numberOfChannels();
@@ -157,7 +151,7 @@ void Reverb::process(const AudioBus* sourceBus, AudioBus* destinationBus, size_t
 
     if (numInputChannels == 2 && numReverbChannels == 2 && numOutputChannels == 2) {
         // 2 -> 2 -> 2
-        const AudioChannel* sourceChannelR = sourceBus->channel(1);
+        AudioChannel* sourceChannelR = sourceBus->channel(1);
         AudioChannel* destinationChannelR = destinationBus->channel(1);
         m_convolvers[0]->process(sourceChannelL, destinationChannelL, framesToProcess);
         m_convolvers[1]->process(sourceChannelR, destinationChannelR, framesToProcess);
@@ -177,13 +171,13 @@ void Reverb::process(const AudioBus* sourceBus, AudioBus* destinationBus, size_t
         ASSERT(isCopySafe);
         if (!isCopySafe)
             return;
-        memcpy(destinationChannelR->mutableData(), destinationChannelL->data(), sizeof(float) * framesToProcess);
+        memcpy(destinationChannelR->data(), destinationChannelL->data(), sizeof(float) * framesToProcess);
     } else if (numInputChannels == 1 && numReverbChannels == 1 && numOutputChannels == 1) {
         // 1 -> 1 -> 1
         m_convolvers[0]->process(sourceChannelL, destinationChannelL, framesToProcess);
     } else if (numInputChannels == 2 && numReverbChannels == 4 && numOutputChannels == 2) {
         // 2 -> 4 -> 2 ("True" stereo)
-        const AudioChannel* sourceChannelR = sourceBus->channel(1);
+        AudioChannel* sourceChannelR = sourceBus->channel(1);
         AudioChannel* destinationChannelR = destinationBus->channel(1);
 
         AudioChannel* tempChannelL = m_tempBuffer->channel(0);

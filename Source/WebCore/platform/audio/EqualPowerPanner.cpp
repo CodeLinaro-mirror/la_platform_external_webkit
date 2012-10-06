@@ -30,17 +30,14 @@
 
 #include "AudioBus.h"
 #include "AudioUtilities.h"
-#include <algorithm>
 #include <wtf/MathExtras.h>
 
 // Use a 50ms smoothing / de-zippering time-constant.
-const float SmoothingTimeConstant = 0.050f;
-
-using namespace std;
-
+const double SmoothingTimeConstant = 0.050;
+ 
 namespace WebCore {
 
-EqualPowerPanner::EqualPowerPanner(float sampleRate)
+EqualPowerPanner::EqualPowerPanner(double sampleRate)
     : Panner(PanningModelEqualPower)
     , m_isFirstRender(true)
     , m_gainL(0.0)
@@ -49,7 +46,7 @@ EqualPowerPanner::EqualPowerPanner(float sampleRate)
     m_smoothingConstant = AudioUtilities::discreteTimeConstantForSampleRate(SmoothingTimeConstant, sampleRate);
 }
 
-void EqualPowerPanner::pan(double azimuth, double /*elevation*/, const AudioBus* inputBus, AudioBus* outputBus, size_t framesToProcess)
+void EqualPowerPanner::pan(double azimuth, double /*elevation*/, AudioBus* inputBus, AudioBus* outputBus, size_t framesToProcess)
 {
     // FIXME: implement stereo sources
     bool isInputSafe = inputBus && inputBus->numberOfChannels() == 1 && framesToProcess <= inputBus->length();
@@ -62,30 +59,25 @@ void EqualPowerPanner::pan(double azimuth, double /*elevation*/, const AudioBus*
     if (!isOutputSafe)
         return;
 
-    const AudioChannel* channel = inputBus->channel(0);
-    const float* sourceP = channel->data();                               
-    float* destinationL = outputBus->channelByType(AudioBus::ChannelLeft)->mutableData();
-    float* destinationR = outputBus->channelByType(AudioBus::ChannelRight)->mutableData();
+    AudioChannel* channel = inputBus->channel(0);
+    float* sourceP = channel->data();                               
+    float* destinationL = outputBus->channelByType(AudioBus::ChannelLeft)->data();
+    float* destinationR = outputBus->channelByType(AudioBus::ChannelRight)->data();
 
     if (!sourceP || !destinationL || !destinationR)
         return;
 
-    // Clamp azimuth to allowed range of -180 -> +180.
-    azimuth = max(-180.0, azimuth);
-    azimuth = min(180.0, azimuth);
-    
-    // Alias the azimuth ranges behind us to in front of us:
-    // -90 -> -180 to -90 -> 0 and 90 -> 180 to 90 -> 0
-    if (azimuth < -90)
-        azimuth = -180 - azimuth;
-    else if (azimuth > 90)
-        azimuth = 180 - azimuth;
-    
-    // Pan smoothly from left to right with azimuth going from -90 -> +90 degrees.
-    double desiredPanPosition = (azimuth + 90) / 180;
+    // Pan smoothly from left to right with azimuth going from -30 -> +30 degrees.
+    double desiredPanPosition;
+    if (azimuth > 30.0)
+        desiredPanPosition = 1.0;
+    else if (azimuth < -30.0)
+        desiredPanPosition = 0.0;
+    else
+        desiredPanPosition = (azimuth + 30.0) / 60.0;
 
-    double desiredGainL = cos(0.5 * piDouble * desiredPanPosition);
-    double desiredGainR = sin(0.5 * piDouble * desiredPanPosition);
+    double desiredGainL = 0.5 * cos(piDouble * desiredPanPosition) + 0.5;
+    double desiredGainR = sqrt(1.0 - desiredGainL*desiredGainL);
 
     // Don't de-zipper on first render call.
     if (m_isFirstRender) {

@@ -39,14 +39,14 @@ namespace WebCore {
 
 class AudioDestinationMac : public AudioDestination {
 public:
-    AudioDestinationMac(AudioSourceProvider&, float sampleRate);
+    AudioDestinationMac(AudioSourceProvider&, double sampleRate);
     virtual ~AudioDestinationMac();
 
     virtual void start();
     virtual void stop();
     bool isPlaying() { return m_isPlaying; }
 
-    float sampleRate() const { return m_sampleRate; }
+    double sampleRate() const { return m_sampleRate; }
 
 private:
     void configure();
@@ -60,7 +60,7 @@ private:
     AudioSourceProvider& m_provider;
     AudioBus m_renderBus;
 
-    float m_sampleRate;
+    double m_sampleRate;
     bool m_isPlaying;
 };
 

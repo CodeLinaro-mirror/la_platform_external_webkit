@@ -73,7 +73,7 @@ public:
     size_t length() const { return m_length; }
 
     // Direct access to PCM sample data
-    float* mutableData() { return m_rawPointer ? m_rawPointer : m_memBuffer->data(); }
+    float* data() { return m_rawPointer ? m_rawPointer : m_memBuffer->data(); }
     const float* data() const { return m_rawPointer ? m_rawPointer : m_memBuffer->data(); }
 
     // Zeroes out all sample values in buffer.
@@ -86,7 +86,7 @@ public:
     }
 
     // Scales all samples by the same amount.
-    void scale(float scale);
+    void scale(double scale);
 
     // A simple memcpy() from the source channel
     void copyFrom(const AudioChannel* sourceChannel);

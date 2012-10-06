@@ -33,7 +33,6 @@
 #include "AudioDestinationMac.h"
 
 #include "AudioSourceProvider.h"
-#include "FloatConversion.h"
 #include <CoreAudio/AudioHardware.h>
 
 namespace WebCore {
@@ -41,12 +40,12 @@ namespace WebCore {
 const int kBufferSize = 128;
 
 // Factory method: Mac-implementation
-PassOwnPtr<AudioDestination> AudioDestination::create(AudioSourceProvider& provider, float sampleRate)
+PassOwnPtr<AudioDestination> AudioDestination::create(AudioSourceProvider& provider, double sampleRate)
 {
     return adoptPtr(new AudioDestinationMac(provider, sampleRate));
 }
 
-float AudioDestination::hardwareSampleRate()
+double AudioDestination::hardwareSampleRate()
 {
     // Determine the default output device's sample-rate.
     AudioDeviceID deviceID = kAudioDeviceUnknown;
@@ -55,7 +54,7 @@ float AudioDestination::hardwareSampleRate()
     AudioObjectPropertyAddress defaultOutputDeviceAddress = { kAudioHardwarePropertyDefaultOutputDevice, kAudioObjectPropertyScopeGlobal, kAudioObjectPropertyElementMaster };
     OSStatus result = AudioObjectGetPropertyData(kAudioObjectSystemObject, &defaultOutputDeviceAddress, 0, 0, &infoSize, (void*)&deviceID);
     if (result)
-        return 0; // error
+        return 0.0; // error
 
     Float64 nominalSampleRate;
     infoSize = sizeof(Float64);
@@ -63,12 +62,12 @@ float AudioDestination::hardwareSampleRate()
     AudioObjectPropertyAddress nominalSampleRateAddress = { kAudioDevicePropertyNominalSampleRate, kAudioObjectPropertyScopeGlobal, kAudioObjectPropertyElementMaster };
     result = AudioObjectGetPropertyData(deviceID, &nominalSampleRateAddress, 0, 0, &infoSize, (void*)&nominalSampleRate);
     if (result)
-        return 0; // error
+        return 0.0; // error
 
-    return narrowPrecisionToFloat(nominalSampleRate);
+    return nominalSampleRate;
 }
 
-AudioDestinationMac::AudioDestinationMac(AudioSourceProvider& provider, float sampleRate)
+AudioDestinationMac::AudioDestinationMac(AudioSourceProvider& provider, double sampleRate)
     : m_outputUnit(0)
     , m_provider(provider)
     , m_renderBus(2, kBufferSize, false)
@@ -76,19 +75,19 @@ AudioDestinationMac::AudioDestinationMac(AudioSourceProvider& provider, float sa
     , m_isPlaying(false)
 {
     // Open and initialize DefaultOutputUnit
-    AudioComponent comp;
-    AudioComponentDescription desc;
+    Component comp;
+    ComponentDescription desc;
 
     desc.componentType = kAudioUnitType_Output;
     desc.componentSubType = kAudioUnitSubType_DefaultOutput;
     desc.componentManufacturer = kAudioUnitManufacturer_Apple;
     desc.componentFlags = 0;
     desc.componentFlagsMask = 0;
-    comp = AudioComponentFindNext(0, &desc);
+    comp = FindNextComponent(0, &desc);
 
     ASSERT(comp);
 
-    OSStatus result = AudioComponentInstanceNew(comp, &m_outputUnit);
+    OSStatus result = OpenAComponent(comp, &m_outputUnit);
     ASSERT(!result);
 
     result = AudioUnitInitialize(m_outputUnit);
@@ -100,7 +99,7 @@ AudioDestinationMac::AudioDestinationMac(AudioSourceProvider& provider, float sa
 AudioDestinationMac::~AudioDestinationMac()
 {
     if (m_outputUnit)
-        AudioComponentInstanceDispose(m_outputUnit);
+        CloseComponent(m_outputUnit);
 }
 
 void AudioDestinationMac::configure()

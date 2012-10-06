@@ -29,6 +29,5 @@ module audio {
         GenerateToJS
     ] ConvolverNode : AudioNode {
         attribute [JSCCustomSetter] AudioBuffer buffer;
-        attribute boolean normalize;
     };
 }

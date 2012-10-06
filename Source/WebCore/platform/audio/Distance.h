@@ -31,8 +31,7 @@
 
 namespace WebCore {
 
-// Distance models are defined according to the OpenAL specification:
-// http://connect.creativelabs.com/openal/Documentation/OpenAL%201.1%20Specification.htm.
+// Distance models are defined according to the OpenAL specification
 
 class DistanceEffect {
 public:

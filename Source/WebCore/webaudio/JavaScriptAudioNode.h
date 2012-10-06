@@ -29,7 +29,6 @@
 #include "AudioNode.h"
 #include "EventListener.h"
 #include "EventTarget.h"
-#include <wtf/Forward.h>
 #include <wtf/PassRefPtr.h>
 #include <wtf/RefPtr.h>
 #include <wtf/Vector.h>
@@ -39,6 +38,7 @@ namespace WebCore {
 class AudioBuffer;
 class AudioContext;
 class AudioProcessingEvent;
+class Float32Array;
 
 // JavaScriptAudioNode is an AudioNode which allows for arbitrary synthesis or processing directly using JavaScript.
 // The API allows for a variable number of inputs and outputs, although it must have at least one input or output.
@@ -46,14 +46,13 @@ class AudioProcessingEvent;
 // The "onaudioprocess" attribute is an event listener which will get called periodically with an AudioProcessingEvent which has
 // AudioBuffers for each input and output.
 
-// FIXME: EventTarget should be introduced at the base of the inheritance hierarchy (i.e., as a base class for AudioNode).
 class JavaScriptAudioNode : public AudioNode, public EventTarget {
 public:
     // bufferSize must be one of the following values: 256, 512, 1024, 2048, 4096, 8192, 16384.
     // This value controls how frequently the onaudioprocess event handler is called and how many sample-frames need to be processed each call.
     // Lower numbers for bufferSize will result in a lower (better) latency. Higher numbers will be necessary to avoid audio breakup and glitches.
     // The value chosen must carefully balance between latency and audio quality.
-    static PassRefPtr<JavaScriptAudioNode> create(AudioContext*, float sampleRate, size_t bufferSize, unsigned numberOfInputs = 1, unsigned numberOfOutputs = 1);
+    static PassRefPtr<JavaScriptAudioNode> create(AudioContext*, double sampleRate, size_t bufferSize, unsigned numberOfInputs = 1, unsigned numberOfOutputs = 1);
 
     virtual ~JavaScriptAudioNode();
 
@@ -78,7 +77,7 @@ public:
     using AudioNode::deref;
     
 private:
-    JavaScriptAudioNode(AudioContext*, float sampleRate, size_t bufferSize, unsigned numberOfInputs, unsigned numberOfOutputs);
+    JavaScriptAudioNode(AudioContext*, double sampleRate, size_t bufferSize, unsigned numberOfInputs, unsigned numberOfOutputs);
 
     static void fireProcessEventDispatch(void* userData);
     void fireProcessEvent();
