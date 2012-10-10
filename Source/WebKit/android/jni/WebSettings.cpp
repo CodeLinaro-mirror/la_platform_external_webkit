@@ -135,6 +135,7 @@ struct FieldIds {
         mSyntheticLinksEnabled = env->GetFieldID(clazz, "mSyntheticLinksEnabled", "Z");
         mUseDoubleTree = env->GetFieldID(clazz, "mUseDoubleTree", "Z");
         mPageCacheCapacity = env->GetFieldID(clazz, "mPageCacheCapacity", "I");
+        mWOFFEnabled = env->GetFieldID(clazz, "mWOFFEnabled", "Z");
 #if ENABLE(WEB_AUTOFILL)
         mAutoFillEnabled = env->GetFieldID(clazz, "mAutoFillEnabled", "Z");
         mAutoFillProfile = env->GetFieldID(clazz, "mAutoFillProfile", "Landroid/webkit/WebSettingsClassic$AutoFillProfile;");
@@ -198,6 +199,7 @@ struct FieldIds {
         ALOG_ASSERT(mUseDoubleTree, "Could not find field mUseDoubleTree");
         ALOG_ASSERT(mPageCacheCapacity, "Could not find field mPageCacheCapacity");
         ALOG_ASSERT(mPasswordEchoEnabled, "Could not find field mPasswordEchoEnabled");
+        ALOG_ASSERT(mWOFFEnabled, "Could not find field mWOFFEnabled");
 
         jclass enumClass = env->FindClass("java/lang/Enum");
         ALOG_ASSERT(enumClass, "Could not find Enum class!");
@@ -249,6 +251,7 @@ struct FieldIds {
     jfieldID mSyntheticLinksEnabled;
     jfieldID mUseDoubleTree;
     jfieldID mPageCacheCapacity;
+    jfieldID mWOFFEnabled;
     // Ordinal() method and value field for enums
     jmethodID mOrdinal;
     jfieldID  mTextSizeValue;
@@ -587,6 +590,9 @@ public:
             WebCore::pageCache()->setCapacity(size);
         } else
             s->setUsesPageCache(false);
+
+            flag = env->GetBooleanField(obj, gFieldIds->mWOFFEnabled);
+            s->setWOFFEnabled(flag);
 
 #if ENABLE(WEB_AUTOFILL)
         flag = env->GetBooleanField(obj, gFieldIds->mAutoFillEnabled);
