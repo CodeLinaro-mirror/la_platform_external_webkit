@@ -44,6 +44,7 @@
 #include <JNIHelp.h>
 #include <JNIUtility.h>
 #include <SkBitmap.h>
+#include "SkBitmapRef.h"
 #include <gui/SurfaceTexture.h>
 #include "AndroidLog.h"
 
@@ -195,21 +196,6 @@ void MediaPlayerPrivate::seek(float time)
     checkException(env);
 }
 
-void MediaPlayerPrivate::prepareToPlay()
-{
-    // We are about to start playing. Since our Java VideoView cannot
-    // buffer any data, we just simply transition to the HaveEnoughData
-    // state in here. This will allow the MediaPlayer to transition to
-    // the "play" state, at which point our VideoView will start downloading
-    // the content and start the playback.
-    if (!mediaPreloadEnabled() || m_player->preload() != MediaPlayer::Auto) {
-        m_networkState = MediaPlayer::Loaded;
-        m_player->networkStateChanged();
-        m_readyState = MediaPlayer::HaveEnoughData;
-        m_player->readyStateChanged();
-    }
-}
-
 MediaPlayerPrivate::MediaPlayerPrivate(MediaPlayer* player)
     : m_player(player),
     m_glue(0),
@@ -283,13 +269,11 @@ public:
     {
         m_url = url;
 
-        // Cheat a bit here to make sure Window.onLoad event can be triggered
-        // at the right time instead of real video play time, since only full
-        // screen video play is supported in Java's VideoView.
-        // See also comments in prepareToPlay function.
         m_networkState = MediaPlayer::Loading;
         m_player->networkStateChanged();
-        m_readyState = MediaPlayer::HaveCurrentData;
+        // Cheat and set ready state to HaveMetadata so that the HTMLMediaElement
+        // displays the media controls properly even if video is not really loaded
+        m_readyState = MediaPlayer::HaveMetadata;
         m_player->readyStateChanged();
     }
 
@@ -323,8 +307,6 @@ public:
     {
         m_networkState = MediaPlayer::Loaded;
         m_player->networkStateChanged();
-        m_readyState = MediaPlayer::HaveEnoughData;
-        m_player->readyStateChanged();
 
         // Don't update width and height here. For HLS video, width and
         // height are both 0 when onPrepared() is called. User would have
@@ -337,21 +319,22 @@ public:
     void updateSizeAndDuration(int duration, int width, int height)
     {
         updateDuration(duration);
-
         m_naturalSize = IntSize(width, height);
         m_naturalSizeUnknown = false;
         m_player->sizeChanged();
         updateVideoLayerSize();
 
-        // This is needed to update the ready and network states in the case
-        // where video goes to fullscreen before it starts playing
-        m_player->prepareToPlay();
+        if (width == 0 || height == 0) {
+            // Video element possibly contains audio track only
+            // advance ready state
+            m_readyState = MediaPlayer::HaveEnoughData;
+            m_player->readyStateChanged();
+        }
     }
 
     void updateVideoLayerSize() {
         TilesManager::instance()->videoLayerManager()->updateVideoLayerSize(
-            m_player->platformLayer()->uniqueId(), m_naturalSize.width() * m_naturalSize.height(),
-            m_naturalSize.width() / (float)m_naturalSize.height());
+            m_player->platformLayer()->uniqueId(), m_naturalSize.width(), m_naturalSize.height());
     }
 
     void updateDuration(int duration)
@@ -408,6 +391,32 @@ public:
         int posterY = ((r.height() - posterHeight) / 2) + r.y();
         IntRect targetRect(posterX, posterY, posterWidth, posterHeight);
         canvas->drawBitmapRect(*m_poster, 0, targetRect, 0);
+    }
+
+    // Paint the video frame
+    //
+    // This function triggers the a repaint of the video frame on the main/UI thread during
+    // which the video frame will be drawn out to a bitmap.  The draw has to occur in the
+    // main/UI thread since the GL context is only valid on the UI thread.
+    //
+    // Note: This can potentially lock the calling thread for up to DRAW_VIDEO_FRAME_TIMEOUT duration.
+    void paintCurrentFrameInContext(GraphicsContext* ctxt, const IntRect& r) {
+        // This function should only be called when ready state is not HaveNothing or HaveMetadata
+        if (m_readyState == MediaPlayer::HaveNothing || m_readyState == MediaPlayer::HaveMetadata) {
+            ALOGE("Attempting to paintCurrentFrameInContext when video is not ready");
+            return;
+        }
+        // Call repaint() to trigger a drawGL in the UI thread
+        m_player->repaint();
+
+        SkBitmapRef* bitmapRef = NULL;
+        if (m_videoLayer->copyToBitmap(bitmapRef)) {
+            ASSERT(bitmapRef != NULL);
+            SkCanvas* canvas = ctxt->platformContext()->getCanvas();
+            canvas->drawBitmapRect(bitmapRef->bitmap(), 0, r, 0);
+            // This should free the bitmap
+            bitmapRef->unref();
+        }
     }
 
     void onPosterFetched(SkBitmap* poster)
@@ -584,6 +593,11 @@ public:
         HTMLMediaElement* element = static_cast<HTMLMediaElement*>(m_player->mediaPlayerClient());
         return element->isFullscreen();
     }
+
+    void onAvailableVideoFrame() {
+        m_readyState = MediaPlayer::HaveEnoughData;
+        m_player->readyStateChanged();
+    }
 };
 
 class MediaPlayerAudioPrivate : public MediaPlayerPrivate {
@@ -600,11 +614,31 @@ public:
         if (!m_glue->m_javaProxy)
             return;
 
+        // Cheat and set ready state to HaveMetadata so that the HTMLMediaElement
+        // displays the media controls properly even if audio is not really loaded
+        m_readyState = MediaPlayer::HaveMetadata;
+        m_player->readyStateChanged();
+
         jstring jUrl = wtfStringToJstring(env, m_url);
         // start loading the data asynchronously
         env->CallVoidMethod(m_glue->m_javaProxy, m_glue->m_setDataSource, jUrl);
         env->DeleteLocalRef(jUrl);
         checkException(env);
+    }
+
+    void prepareToPlay()
+    {
+        // We are about to start playing. Since our Java proxy player cannot
+        // buffer any data, we just simply transition to the HaveEnoughData
+        // state in here. This will allow the MediaPlayer to transition to
+        // the "play" state, at which point our MediaPlayer will start downloading
+        // the content and start the playback.
+        if (!mediaPreloadEnabled() || m_player->preload() != MediaPlayer::Auto) {
+            m_networkState = MediaPlayer::Loaded;
+            m_player->networkStateChanged();
+            m_readyState = MediaPlayer::HaveEnoughData;
+            m_player->readyStateChanged();
+        }
     }
 
     void play()
@@ -780,6 +814,14 @@ static void OnPlaying(JNIEnv* env, jobject obj, int pointer)
     }
 }
 
+static void OnAvailableVideoFrame(JNIEnv* env, jobject obj, int pointer)
+{
+    if (pointer) {
+        WebCore::MediaPlayerPrivate* player = reinterpret_cast<WebCore::MediaPlayerPrivate*>(pointer);
+        player->onAvailableVideoFrame();
+    }
+}
+
 static void OnPosterFetched(JNIEnv* env, jobject obj, jobject poster, int pointer)
 {
     if (!pointer || !poster)
@@ -915,7 +957,9 @@ static JNINativeMethod g_MediaPlayerMethods[] = {
     { "nativePrepareEnterFullscreen", "(I)V",
         (void*) PrepareEnterFullscreen },
     { "nativePrepareExitFullscreen", "(I)V",
-        (void*) PrepareExitFullscreen }
+        (void*) PrepareExitFullscreen },
+    { "nativeOnAvailableVideoFrame", "(I)V",
+        (void*) OnAvailableVideoFrame }
 };
 
 static JNINativeMethod g_MediaAudioPlayerMethods[] = {

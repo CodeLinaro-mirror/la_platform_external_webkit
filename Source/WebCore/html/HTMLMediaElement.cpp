@@ -2214,7 +2214,12 @@ void HTMLMediaElement::updatePlayState()
         return;
     }
 
+#if PLATFORM(ANDROID)
+    // Allow android to play from a non-loaded state
+    bool shouldBePlaying = couldPlayIfEnoughData();
+#else
     bool shouldBePlaying = potentiallyPlaying();
+#endif
     bool playerPaused = m_player->paused();
 
     LOG(Media, "HTMLMediaElement::updatePlayState - shouldBePlaying = %s, playerPaused = %s",
