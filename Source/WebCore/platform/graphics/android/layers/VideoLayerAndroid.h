@@ -46,6 +46,16 @@ public:
     virtual void notifyRectChange(const FloatRect&) = 0;
 };
 
+// This instance is shared between the WebCore and UI copies of VideoLayerAndroid
+class FrameCaptureMutex : public SkRefCnt {
+public:
+    android::Condition& condition() { return m_condition; }
+    android::Mutex& mutex() { return m_mutex; }
+private:
+    android::Condition m_condition;
+    android::Mutex m_mutex;
+};
+
 class VideoLayerAndroid : public LayerAndroid {
 
 public:
@@ -62,10 +72,12 @@ public:
     void setSurfaceTexture(sp<SurfaceTexture> texture, int textureName);
     virtual bool needsIsolatedSurface() { return true; }
     void registerVideoLayerObserver(VideoLayerObserverInterface* observer);
+    bool copyToBitmap(SkBitmapRef*& bitmapRef);
+
 private:
-    void init();
     void showProgressSpinner(const SkRect& innerRect);
     SkRect calVideoRect(const SkRect& rect);
+    void serviceFrameCapture();
     // Surface texture for showing the video is actually allocated in Java side
     // and passed into this native code.
     sp<android::SurfaceTexture> m_surfaceTexture;
@@ -75,6 +87,10 @@ private:
     static const int ROTATESTEP = 12;
 
     VideoLayerObserverInterface* m_observer;
+
+    // Use for signalling between rendering and UI thread for
+    // video frame capture case
+    SkRefPtr<FrameCaptureMutex> m_frameCaptureMutex;
 };
 
 } // namespace WebCore
