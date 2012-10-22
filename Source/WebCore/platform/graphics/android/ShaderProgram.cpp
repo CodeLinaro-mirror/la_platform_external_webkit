@@ -473,7 +473,10 @@ void ShaderProgram::setScreenClip(const IntRect& clip)
     // the clip from frameworks is in full screen coordinates
     mclip.setY(clip.y() - m_webViewRect.y() - m_titleBarHeight);
     FloatRect tclip = convertInvScreenCoordToScreenCoord(mclip);
-    IntRect screenClip(tclip.x(), tclip.y(), tclip.width(), tclip.height());
+    IntRect screenClip;
+    screenClip.setLocation(IntPoint(tclip.x(), tclip.y()));
+    // use ceilf to handle view -> doc -> view coord rounding errors
+    screenClip.setSize(IntSize(ceilf(tclip.width()), ceilf(tclip.height())));
     m_screenClip = screenClip;
 }
 
