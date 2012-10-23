@@ -61,6 +61,9 @@
 #include "IconDatabase.h"
 #include "Image.h"
 #include "InspectorClientAndroid.h"
+#include "JavaClassJobjectV8.h"
+#include "JavaNPObjectV8.h"
+#include "JavaInstanceJobjectV8.h"
 #include "KURL.h"
 #include "Page.h"
 #include "PageCache.h"
@@ -1802,9 +1805,9 @@ public:
         return adoptRef(new WeakJavaInstance(obj, root));
     }
 #elif USE(V8)
-    static PassRefPtr<WeakJavaInstance> create(jobject obj)
+    static PassRefPtr<WeakJavaInstance> create(jobject obj, bool requireAnnotation)
     {
-        return adoptRef(new WeakJavaInstance(obj));
+        return adoptRef(new WeakJavaInstance(obj, requireAnnotation));
     }
 #endif
 
@@ -1813,8 +1816,8 @@ private:
     WeakJavaInstance(jobject instance, PassRefPtr<RootObject> rootObject)
         : JavaInstance(instance, rootObject)
 #elif USE(V8)
-    WeakJavaInstance(jobject instance)
-        : JavaInstanceJobject(instance)
+    WeakJavaInstance(jobject instance, bool requireAnnotation)
+        : JavaInstanceJobject(instance, requireAnnotation)
 #endif
         , m_beginEndDepth(0)
     {
@@ -1876,7 +1879,7 @@ private:
 };
 
 static void AddJavascriptInterface(JNIEnv *env, jobject obj, jint nativeFramePointer,
-        jobject javascriptObj, jstring interfaceName)
+        jobject javascriptObj, jstring interfaceName, jboolean requireAnnotation)
 {
 #ifdef ANDROID_INSTRUMENT
     TimeCounterAuto counter(TimeCounter::NativeCallbackTimeCounter);
@@ -1915,7 +1918,8 @@ static void AddJavascriptInterface(JNIEnv *env, jobject obj, jint nativeFramePoi
     }
 #elif USE(V8)
     if (pFrame) {
-        RefPtr<JavaInstance> addedObject = WeakJavaInstance::create(javascriptObj);
+        RefPtr<JavaInstance> addedObject = WeakJavaInstance::create(javascriptObj,
+                requireAnnotation);
         const char* name = getCharactersFromJStringInEnv(env, interfaceName);
         // Pass ownership of the added object to bindToWindowObject.
         NPObject* npObject = JavaInstanceToNPObject(addedObject.get());
@@ -2350,7 +2354,7 @@ static JNINativeMethod gBrowserFrameNativeMethods[] = {
         (void*) Reload },
     { "nativeGoBackOrForward", "(I)V",
         (void*) GoBackOrForward },
-    { "nativeAddJavascriptInterface", "(ILjava/lang/Object;Ljava/lang/String;)V",
+    { "nativeAddJavascriptInterface", "(ILjava/lang/Object;Ljava/lang/String;Z)V",
         (void*) AddJavascriptInterface },
     { "stringByEvaluatingJavaScriptFromString",
             "(Ljava/lang/String;)Ljava/lang/String;",
@@ -2387,6 +2391,8 @@ static JNINativeMethod gBrowserFrameNativeMethods[] = {
 
 int registerWebFrame(JNIEnv* env)
 {
+    JavaClassJobject::RegisterJavaClassJobject(env);
+
     jclass clazz = env->FindClass("android/webkit/BrowserFrame");
     LOG_ASSERT(clazz, "Cannot find BrowserFrame");
     gFrameField = env->GetFieldID(clazz, "mNativeFrame", "I");
