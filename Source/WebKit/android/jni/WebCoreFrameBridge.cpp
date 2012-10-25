@@ -61,9 +61,6 @@
 #include "IconDatabase.h"
 #include "Image.h"
 #include "InspectorClientAndroid.h"
-#include "JavaClassJobjectV8.h"
-#include "JavaNPObjectV8.h"
-#include "JavaInstanceJobjectV8.h"
 #include "KURL.h"
 #include "Page.h"
 #include "PageCache.h"
@@ -121,6 +118,7 @@
 #include "JavaNPObjectV8.h"
 #include "JavaInstanceJobjectV8.h"
 #include "V8Counters.h"
+#include "JavaClassJobjectV8.h"
 #endif  // USE(JSC)
 
 #include <cutils/properties.h>
@@ -2391,7 +2389,9 @@ static JNINativeMethod gBrowserFrameNativeMethods[] = {
 
 int registerWebFrame(JNIEnv* env)
 {
+#if USE(V8)
     JavaClassJobject::RegisterJavaClassJobject(env);
+#endif
 
     jclass clazz = env->FindClass("android/webkit/BrowserFrame");
     LOG_ASSERT(clazz, "Cannot find BrowserFrame");
