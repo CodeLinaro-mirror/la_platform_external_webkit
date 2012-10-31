@@ -269,7 +269,7 @@ Tile* TileGrid::getTile(int x, int y)
 {
     for (unsigned int i = 0; i <m_tiles.size(); i++) {
         Tile* tile = m_tiles[i];
-        if (tile->x() == x && tile->y() == y)
+        if (tile && tile->x() == x && tile->y() == y)
             return tile;
     }
     return 0;
