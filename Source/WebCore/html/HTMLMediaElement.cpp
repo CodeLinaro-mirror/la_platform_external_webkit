@@ -1756,6 +1756,7 @@ KURL HTMLMediaElement::selectNextSourceChild(ContentType *contentType, InvalidSo
     HTMLSourceElement* source = 0;
     bool lookingForStartNode = m_nextChildNodeToConsider;
     bool canUse = false;
+    size_t pos;
 
     for (node = firstChild(); !canUse && node; node = node->nextSibling()) {
         if (lookingForStartNode && m_nextChildNodeToConsider != node)
@@ -1775,7 +1776,16 @@ KURL HTMLMediaElement::selectNextSourceChild(ContentType *contentType, InvalidSo
 #endif
         if (mediaURL.isEmpty())
             goto check_again;
-        
+
+        // skip HLS content
+        pos = mediaURL.string().reverseFind('.');
+        if (pos) {
+            String extension = mediaURL.string().substring(pos + 1);
+            if ((extension.length() > 3) && (extension.startsWith("m3u8",false))) {
+                goto check_again;
+            }
+        }
+
         if (source->hasAttribute(mediaAttr)) {
             MediaQueryEvaluator screenEval("screen", document()->frame(), renderer() ? renderer()->style() : 0);
             RefPtr<MediaList> media = MediaList::createAllowingDescriptionSyntax(source->media());
