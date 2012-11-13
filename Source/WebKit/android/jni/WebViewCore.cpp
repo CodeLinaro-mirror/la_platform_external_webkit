@@ -35,6 +35,9 @@
 #include "AndroidHitTestResult.h"
 #include "Attribute.h"
 #include "content/address_detector.h"
+#if ENABLE(WEB_AUDIO)
+#include "AudioDestination.h"
+#endif
 #include "Chrome.h"
 #include "ChromeClientAndroid.h"
 #include "ChromiumIncludes.h"
@@ -1986,6 +1989,44 @@ AndroidHitTestResult WebViewCore::hitTestAtPoint(int x, int y, int slop, bool do
     return androidHitResult;
 }
 
+///////////////////////////////////////////////////////////////////////////////
+
+#if ENABLE(WEB_AUDIO)
+void WebViewCore::addAudioDestination(WebCore::AudioDestination* t)
+{
+//    SkDebugf("----------- addAudioDestination %p", t);
+    *m_audioDestinations.append() = t;
+}
+
+void WebViewCore::removeAudioDestination(WebCore::AudioDestination* t)
+{
+//    SkDebugf("----------- removeAudioDestination %p", t);
+    int index = m_audioDestinations.find(t);
+    if (index < 0) {
+        SkDebugf("--------------- removeAudioDestination not found! %p\n", t);
+    } else {
+        m_audioDestinations.removeShuffle(index);
+    }
+}
+
+void WebViewCore::pauseAudioDestinations()
+{
+    WebCore::AudioDestination** iter = m_audioDestinations.begin();
+    WebCore::AudioDestination** stop = m_audioDestinations.end();
+
+    for (; iter < stop; ++iter)
+        (*iter)->pause();
+}
+
+void WebViewCore::resumeAudioDestinations()
+{
+    WebCore::AudioDestination** iter = m_audioDestinations.begin();
+    WebCore::AudioDestination** stop = m_audioDestinations.end();
+
+    for (; iter < stop; ++iter)
+        (*iter)->start();
+}
+#endif
 ///////////////////////////////////////////////////////////////////////////////
 
 void WebViewCore::addPlugin(PluginWidgetAndroid* w)
@@ -4841,6 +4882,9 @@ static void Pause(JNIEnv* env, jobject obj, jint nativeClass)
     SkANP::InitEvent(&event, kLifecycle_ANPEventType);
     event.data.lifecycle.action = kPause_ANPLifecycleAction;
     viewImpl->sendPluginEvent(event);
+#if ENABLE(WEB_AUDIO)
+    viewImpl->pauseAudioDestinations();
+#endif
 
     viewImpl->setIsPaused(true);
 }
@@ -4868,6 +4912,9 @@ static void Resume(JNIEnv* env, jobject obj, jint nativeClass)
     SkANP::InitEvent(&event, kLifecycle_ANPEventType);
     event.data.lifecycle.action = kResume_ANPLifecycleAction;
     viewImpl->sendPluginEvent(event);
+#if ENABLE(WEB_AUDIO)
+    viewImpl->resumeAudioDestinations();
+#endif
 
     viewImpl->setIsPaused(false);
 }
