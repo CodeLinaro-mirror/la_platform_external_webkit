@@ -60,6 +60,8 @@ public:
     GraphicsContextPlatformPrivate(PlatformGraphicsContext* platformContext)
         : m_context(platformContext) { }
 
+    ~GraphicsContextPlatformPrivate(){ if(m_context && m_context->deleteUs()) delete m_context;    }
+
     PlatformGraphicsContext* context() { return m_context; }
 
 private:
