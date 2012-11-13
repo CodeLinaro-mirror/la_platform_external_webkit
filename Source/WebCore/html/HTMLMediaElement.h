@@ -39,6 +39,10 @@
 
 namespace WebCore {
 
+#if ENABLE(WEB_AUDIO)
+class AudioSourceProvider;
+class MediaElementAudioSourceNode;
+#endif
 class Event;
 class HTMLSourceElement;
 class MediaControls;
@@ -178,6 +182,13 @@ public:
 
     void sourceWillBeRemoved(HTMLSourceElement*);
     void sourceWasAdded(HTMLSourceElement*);
+
+#if ENABLE(WEB_AUDIO)
+    MediaElementAudioSourceNode* audioSourceNode() { return m_audioSourceNode; }
+    void setAudioSourceNode(MediaElementAudioSourceNode*);
+
+    AudioSourceProvider* audioSourceProvider();
+#endif
 
     void privateBrowsingStateDidChange();
 
@@ -412,6 +423,13 @@ private:
 
 #if ENABLE(PLUGIN_PROXY_FOR_VIDEO)
     bool m_needWidgetUpdate : 1;
+#endif
+
+#if ENABLE(WEB_AUDIO)
+    // This is a weak reference, since m_audioSourceNode holds a reference to us.
+    // The value is set just after the MediaElementAudioSourceNode is created.
+    // The value is cleared in MediaElementAudioSourceNode::~MediaElementAudioSourceNode().
+    MediaElementAudioSourceNode* m_audioSourceNode;
 #endif
 
     bool m_dispatchingCanPlayEvent : 1;

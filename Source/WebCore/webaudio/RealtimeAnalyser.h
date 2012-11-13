@@ -26,6 +26,7 @@
 #define RealtimeAnalyser_h
 
 #include "AudioArray.h"
+#include <wtf/Forward.h>
 #include <wtf/Noncopyable.h>
 #include <wtf/OwnPtr.h>
 
@@ -33,11 +34,6 @@ namespace WebCore {
 
 class AudioBus;
 class FFTFrame;
-
-#if ENABLE(WEBGL)
-class Float32Array;
-class Uint8Array;
-#endif
 
 class RealtimeAnalyser {
     WTF_MAKE_NONCOPYABLE(RealtimeAnalyser);
@@ -61,11 +57,9 @@ public:
     void setSmoothingTimeConstant(float k) { m_smoothingTimeConstant = k; }
     float smoothingTimeConstant() const { return static_cast<float>(m_smoothingTimeConstant); }
 
-#if ENABLE(WEBGL)
     void getFloatFrequencyData(Float32Array*);
     void getByteFrequencyData(Uint8Array*);
     void getByteTimeDomainData(Uint8Array*);
-#endif
 
     // The audio thread writes input data here.
     void writeInput(AudioBus*, size_t framesToProcess);
@@ -75,6 +69,7 @@ public:
     static const double DefaultMaxDecibels;
 
     static const unsigned DefaultFFTSize;
+    static const unsigned MinFFTSize;
     static const unsigned MaxFFTSize;
     static const unsigned InputBufferSize;
 
