@@ -2531,7 +2531,7 @@ Node* WebViewCore::getNextAnchorNode(Node* anchorNode, bool ignoreFirstNode, int
                 || isContentInputElement(currentNode))
             return currentNode;
         if (direction == DIRECTION_FORWARD)
-            currentNode = currentNode->traverseNextNodeFastPath();
+            currentNode = currentNode->traverseNextNode();
         else
             currentNode = currentNode->traversePreviousNodePostOrder(body);
     }
@@ -2653,7 +2653,7 @@ Node* WebViewCore::getIntermediaryInputElement(Node* fromNode, Node* toNode, int
         while (currentNode && currentNode != toNode) {
             if (isContentInputElement(currentNode))
                 return currentNode;
-            currentNode = currentNode->traverseNextNodeFastPath();
+            currentNode = currentNode->traverseNextNode();
         }
     } else {
         Node* currentNode = fromNode->traversePreviousNode();
