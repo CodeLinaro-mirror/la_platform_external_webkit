@@ -620,12 +620,8 @@ void Node::setNodeValue(const String& /*nodeValue*/, ExceptionCode& ec)
 PassRefPtr<NodeList> Node::childNodes()
 {
     NodeListsNodeData* data = ensureRareData()->ensureNodeLists(this);
-    if (data->m_childNodeListCache)
-        return PassRefPtr<ChildNodeList>(data->m_childNodeListCache);
 
-    RefPtr<ChildNodeList> childNodeList = ChildNodeList::create(this);
-    data->m_childNodeListCache = childNodeList.get();
-    return childNodeList.release();
+    return ChildNodeList::create(this, data->m_childNodeListCaches.get());
 }
 
 Node *Node::lastDescendant() const
@@ -1139,16 +1135,6 @@ void Node::removeCachedLabelsNodeList(DynamicNodeList* list)
     
     NodeListsNodeData* data = rareData()->nodeLists();
     data->m_labelsNodeListCache = 0;
-}
-
-void Node::removeCachedChildNodeList(DynamicNodeList* list)
-{
-    ASSERT(rareData());
-    ASSERT(rareData()->nodeLists());
-    ASSERT_UNUSED(list, list->hasOwnCaches());
-
-    NodeListsNodeData* data = rareData()->nodeLists();
-    data->m_childNodeListCache = 0;
 }
 
 Node* Node::traverseNextNode(const Node* stayWithin) const
@@ -2496,8 +2482,7 @@ void Node::formatForDebugger(char* buffer, unsigned length) const
 
 void NodeListsNodeData::invalidateCaches()
 {
-    if (m_childNodeListCache)
-        m_childNodeListCache->invalidateCache();
+    m_childNodeListCaches->reset();
 
     if (m_labelsNodeListCache)
         m_labelsNodeListCache->invalidateCache();
@@ -2528,7 +2513,7 @@ bool NodeListsNodeData::isEmpty() const
     if (!m_listsWithCaches.isEmpty())
         return false;
 
-    if (m_childNodeListCache)
+    if (m_childNodeListCaches->refCount())
         return false;
     
     TagNodeListCacheNS::const_iterator tagCacheEndNS = m_tagNodeListCacheNS.end();
