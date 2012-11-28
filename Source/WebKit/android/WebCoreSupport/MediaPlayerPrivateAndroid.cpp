@@ -292,7 +292,6 @@ public:
                             static_cast<jint>(m_currentTime * 1000.0f),
                             isFullscreen());
         env->DeleteLocalRef(jUrl);
-
         checkException(env);
     }
 
@@ -360,6 +359,20 @@ public:
         env->CallVoidMethod(m_glue->m_javaProxy, m_glue->m_loadPoster, jUrl);
         env->DeleteLocalRef(jUrl);
     }
+
+    bool hasSingleSecurityOrigin() const
+    {
+        String mimeType = m_player->getMimeType();
+        if (mimeType.isEmpty())
+            return false;
+
+        // Only playlist types may have multiple security origins (e.g. Apple
+        // HTTP Live Streaming). TODO: Ideally we'd want the MediaPlayer to
+        // tell us if all referenced resources within a media file have the
+        // same origin so that we don't have to blacklist all playlist files.
+        return !WebViewCore::isPlayListMimeType(mimeType);
+    }
+
     void paint(GraphicsContext* ctxt, const IntRect& r)
     {
         if (ctxt->paintingDisabled())
