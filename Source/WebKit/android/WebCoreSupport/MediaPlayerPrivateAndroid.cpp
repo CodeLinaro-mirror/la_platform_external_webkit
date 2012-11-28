@@ -1,6 +1,6 @@
 /*
  * Copyright 2009, The Android Open Source Project
- * Copyright (c) 2011, 2012, Code Aurora Forum. All rights reserved.
+ * Copyright (c) 2011, 2012, The Linux Foundation. All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions
@@ -85,6 +85,7 @@ struct MediaPlayerPrivate::JavaGlue {
     // Video
     jmethodID m_getInstance;
     jmethodID m_loadPoster;
+    jmethodID m_setVisibility;
     jmethodID m_loadVideo;
     jmethodID m_loadMetadata;
     jmethodID m_enterFullscreen;
@@ -161,20 +162,36 @@ void MediaPlayerPrivate::setVolume(float volume)
 void MediaPlayerPrivate::setVisible(bool visible)
 {
     m_isVisible = visible;
-    if (m_isVisible)
-        createJavaPlayerIfNeeded();
+
+    createJavaPlayerIfNeeded();
+
+    if (!m_glue->m_javaProxy)
+        return;
+
+    JNIEnv* env = JSC::Bindings::getJNIEnv();
+    env->CallVoidMethod(m_glue->m_javaProxy, m_glue->m_setVisibility, m_isVisible);
+    checkException(env);
 }
 
 void MediaPlayerPrivate::seek(float time)
 {
-    JNIEnv* env = JSC::Bindings::getJNIEnv();
-    if (!env || !m_url.length())
+    if (!m_url.length())
         return;
 
-    if (m_glue->m_javaProxy) {
-        env->CallVoidMethod(m_glue->m_javaProxy, m_glue->m_seek, static_cast<jint>(time * 1000.0f));
-        m_currentTime = time;
-    }
+    // prepareToPlay may not cause an onPrepared depending on the preload
+    // settings. Need to assure the Java player sends an onPrepared so that
+    // HTMLMediaElement::playInternal can trigger a playing event when the play
+    // command comes in from JavaScript so that it will be forwarded here.
+    createJavaPlayerIfNeeded();
+
+    if (!m_glue->m_javaProxy)
+        return;
+
+    JNIEnv* env = JSC::Bindings::getJNIEnv();
+    env->CallVoidMethod(m_glue->m_javaProxy, m_glue->m_seek, static_cast<jint>(time * 1000.0f));
+
+    m_currentTime = time;
+
     checkException(env);
 }
 
@@ -265,6 +282,7 @@ public:
     void load(const String& url)
     {
         m_url = url;
+
         // Cheat a bit here to make sure Window.onLoad event can be triggered
         // at the right time instead of real video play time, since only full
         // screen video play is supported in Java's VideoView.
@@ -277,8 +295,12 @@ public:
 
     void play()
     {
-        JNIEnv* env = JSC::Bindings::getJNIEnv();
-        if (!env || !m_url.length() || !m_glue->m_javaProxy)
+        if (!m_url.length())
+            return;
+
+        createJavaPlayerIfNeeded();
+
+        if (!m_glue->m_javaProxy)
             return;
 
         m_paused = false;
@@ -287,6 +309,7 @@ public:
         if (m_currentTime == duration())
             m_currentTime = 0;
 
+        JNIEnv* env = JSC::Bindings::getJNIEnv();
         jstring jUrl = wtfStringToJstring(env, m_url);
         env->CallVoidMethod(m_glue->m_javaProxy, m_glue->m_play, jUrl,
                             static_cast<jint>(m_currentTime * 1000.0f),
@@ -443,6 +466,7 @@ public:
         m_glue->m_getInstance = env->GetStaticMethodID(clazz, "getInstance", "(Landroid/webkit/WebViewCore;II)Landroid/webkit/HTML5VideoViewProxy;");
         m_glue->m_loadPoster = env->GetMethodID(clazz, "loadPoster", "(Ljava/lang/String;)V");
         m_glue->m_play = env->GetMethodID(clazz, "play", "(Ljava/lang/String;IZ)V");
+        m_glue->m_setVisibility = env->GetMethodID(clazz, "setVisibility", "(Z)V");
 
         m_glue->m_teardown = env->GetMethodID(clazz, "teardown", "()V");
         m_glue->m_seek = env->GetMethodID(clazz, "seek", "(I)V");
@@ -493,6 +517,7 @@ public:
             jUrl = wtfStringToJstring(env, m_posterUrl);
         // Sending a NULL jUrl allows the Java side to try to load the default poster.
         env->CallVoidMethod(m_glue->m_javaProxy, m_glue->m_loadPoster, jUrl);
+
         if (jUrl)
             env->DeleteLocalRef(jUrl);
 
