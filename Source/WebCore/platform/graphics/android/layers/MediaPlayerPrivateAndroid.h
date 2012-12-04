@@ -98,7 +98,7 @@ public:
 
     virtual bool canLoadPoster() const { return false; }
     virtual void setPoster(const String&) { }
-    virtual void prepareToPlay();
+    virtual void prepareToPlay() { }
 
     virtual void paint(GraphicsContext*, const IntRect&) { }
 
@@ -109,6 +109,7 @@ public:
     void onPaused();
     void onPlaying();
     virtual void onPosterFetched(SkBitmap*) { }
+    virtual void onAvailableVideoFrame() { }
     void onBuffering(int percent);
     void onTimeupdate(int position);
     void onRestoreState();
