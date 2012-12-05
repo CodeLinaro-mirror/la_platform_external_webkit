@@ -185,12 +185,10 @@ void MediaPlayerPrivate::prepareToPlay()
     // state in here. This will allow the MediaPlayer to transition to
     // the "play" state, at which point our VideoView will start downloading
     // the content and start the playback.
-    if (!mediaPreloadEnabled() || m_player->preload() != MediaPlayer::Auto) {
-        m_networkState = MediaPlayer::Loaded;
-        m_player->networkStateChanged();
-        m_readyState = MediaPlayer::HaveEnoughData;
-        m_player->readyStateChanged();
-    }
+    m_networkState = MediaPlayer::Loaded;
+    m_player->networkStateChanged();
+    m_readyState = MediaPlayer::HaveEnoughData;
+    m_player->readyStateChanged();
 }
 
 MediaPlayerPrivate::MediaPlayerPrivate(MediaPlayer* player)
@@ -298,11 +296,6 @@ public:
 
     void onPrepared(int duration, int width, int height)
     {
-        m_networkState = MediaPlayer::Loaded;
-        m_player->networkStateChanged();
-        m_readyState = MediaPlayer::HaveEnoughData;
-        m_player->readyStateChanged();
-
         // Don't update width and height here. For HLS video, width and
         // height are both 0 when onPrepared() is called. User would have
         // no way to access the video control to start the video if width
