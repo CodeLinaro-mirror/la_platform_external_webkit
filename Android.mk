@@ -313,6 +313,7 @@ endif
 ifeq ($(ENABLE_WEBGL),true)
 LOCAL_CFLAGS += -DENABLE_WEBGL
 endif
+LOCAL_CFLAGS += -DENABLE_REQUEST_ANIMATION_FRAME=1
 
 # LOCAL_LDLIBS is used in simulator builds only and simulator builds are only
 # valid on Linux
