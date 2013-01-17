@@ -37,6 +37,7 @@
 #include "Tile.h"
 #include "TileTexture.h"
 #include "TilesManager.h"
+#include "ImagesManager.h"
 #include <android/native_window.h>
 #include <gui/SurfaceTexture.h>
 #include <gui/SurfaceTextureClient.h>
@@ -448,7 +449,13 @@ void TransferQueue::addItemInPureColorQueue(const TileRenderInfo* renderInfo)
 void TransferQueue::clearItemInTranferQueue(int index)
 {
     m_transferQueue[index].savedTilePtr = 0;
-    SkSafeUnref(m_transferQueue[index].savedTilePainter);
+    if (m_transferQueue[index].savedTilePainter &&
+        m_transferQueue[index].savedTilePainter->type() == TilePainter::Image) {
+        ImageTexture* image = static_cast<ImageTexture*>(m_transferQueue[index].savedTilePainter);
+        ImagesManager::instance()->releaseImage(image->imageCRC());
+    } else {
+        SkSafeUnref(m_transferQueue[index].savedTilePainter);
+    }
     m_transferQueue[index].savedTilePainter = 0;
     m_transferQueue[index].status = emptyItem;
 }
@@ -461,7 +468,12 @@ void TransferQueue::addItemCommon(const TileRenderInfo* renderInfo,
 {
     data->savedTileTexturePtr = renderInfo->baseTile->backTexture();
     data->savedTilePainter = renderInfo->tilePainter;
-    SkSafeRef(data->savedTilePainter);
+    if (data->savedTilePainter && data->savedTilePainter->type() == TilePainter::Image) {
+        ImageTexture* image = static_cast<ImageTexture*>(data->savedTilePainter);
+        ImagesManager::instance()->retainImage(image->imageCRC());
+    } else {
+        SkSafeRef(data->savedTilePainter);
+    }
     data->savedTilePtr = renderInfo->baseTile;
     data->status = pendingBlit;
     data->uploadType = type;
