@@ -1,6 +1,6 @@
 /*
     Copyright (C) 2008 Nokia Corporation and/or its subsidiary(-ies)
-    Copyright (c) 2011, Code Aurora Forum. All rights reserved.
+    Copyright (c) 2011, The Linux Foundation. All rights reserved.
 
     This library is free software; you can redistribute it and/or
     modify it under the terms of the GNU Library General Public
