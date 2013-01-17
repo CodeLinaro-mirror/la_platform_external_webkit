@@ -255,7 +255,7 @@ public:
             return;
 
         // We only play video fullscreen on Android, so stop sites playing fullscreen video in the onload handler.
-        Frame* frame = m_player->frameView()->frame();
+        Frame* frame = m_player->frameView() ? m_player->frameView()->frame() : 0;
         if (frame && !frame->loader()->documentLoader()->wasOnloadHandled())
             return;
 
