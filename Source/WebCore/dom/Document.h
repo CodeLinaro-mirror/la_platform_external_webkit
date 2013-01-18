@@ -8,7 +8,7 @@
  * Copyright (C) 2010 Nokia Corporation and/or its subsidiary(-ies)
  * Copyright (C) 2011, 2012 Sony Ericsson Mobile Communications AB
  * Copyright (C) 2012 Sony Mobile Communcations AB
- * Copyright (c) 2011, 2012 Code Aurora Forum. All rights reserved
+ * Copyright (c) 2011, 2012 The Linux Foundation. All rights reserved
  *
  * This library is free software; you can redistribute it and/or
  * modify it under the terms of the GNU Library General Public
