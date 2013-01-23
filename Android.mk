@@ -94,6 +94,7 @@ LOCAL_C_INCLUDES := \
 	external/skia/include/utils \
 	external/skia/src/ports \
 	external/sqlite/dist \
+	external/zlib \
 	frameworks/base/core/jni/android/graphics \
 	frameworks/base/include \
         bionic/libc/bionic
