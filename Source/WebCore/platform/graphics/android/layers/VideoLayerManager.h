@@ -47,6 +47,14 @@ enum IconType {
     PauseIcon
 };
 
+// state get from UI thread to decide which image to draw.
+// PREPARING should be the progressing image
+// PLAYING will be the Video (Surface Texture).
+// Otherwise will draw a static image.
+// NOTE: These values are matching the ones in HTML5VideoView.java
+// Please keep them in sync when changed here.
+typedef enum {RELEASED, INITIALIZED, PREPARING, PREPARED, PLAYING, BUFFERING, DETACHED} PlayerState;
+
 static const size_t surfaceMatrixSize = 4 * 4;
 
 // Every video layer can use its uniqueId to query VideoLayerManager about such
@@ -62,6 +70,7 @@ struct VideoLayerInfo {
 
     double lastIconShownTime;
     IconState iconState;
+    PlayerState playerState;
 };
 
 
@@ -78,6 +87,8 @@ public:
     void updateVideoLayerSize(const int layerId, const int size, const float ratio);
     // At draw time, update the matrix for every video frame update.
     void updateMatrix(const int layerId, const GLfloat* matrix);
+    // Set the player state
+    void updatePlayerState(const int layerId, const PlayerState playerState);
     // Remove the layer info from the mapping.
     void removeLayer(const int layerId);
     // Mark this texture to be eligible for recycling if needed
@@ -89,6 +100,8 @@ public:
     GLfloat* getMatrix(const int layerId);
     // Return the aspect ratio for the video corresponding to the layerId
     float getAspectRatio(const int layerId);
+    // Return the player state
+    PlayerState getPlayerState(const int layerId);
 
     // Delete the GL textures
     void deleteUnusedTextures();
