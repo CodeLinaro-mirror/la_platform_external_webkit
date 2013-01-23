@@ -6,7 +6,7 @@
  * Copyright (C) 2004, 2005, 2006, 2007, 2008, 2009, 2010 Apple Inc. All rights reserved.
  * Copyright (C) 2008, 2009 Torch Mobile Inc. All rights reserved. (http://www.torchmobile.com/)
  * Copyright (C) 2010 Nokia Corporation and/or its subsidiary(-ies)
- * Copyright (c) 2011, 2012 Code Aurora Forum. All rights reserved
+ * Copyright (c) 2011, 2012 The Linux Foundation All rights reserved
  * Copyright (C) 2011, 2012 Sony Ericsson Mobile Communications AB
  * Copyright (C) 2012 Sony Mobile Communcations AB
  *
@@ -104,6 +104,7 @@ class MediaQueryMatcher;
 class MouseEventWithHitTestResults;
 class NodeFilter;
 class NodeIterator;
+class NodeRareData;
 class Page;
 class PlatformMouseEvent;
 class ProcessingInstruction;
@@ -1109,11 +1110,13 @@ public:
 
     ContentSecurityPolicy* contentSecurityPolicy() { return m_contentSecurityPolicy.get(); }
 
+    NodeRareData* documentRareData() const { return m_documentRareData; };
+    void setDocumentRareData(NodeRareData* rareData) { m_documentRareData = rareData; }
+
 protected:
     Document(Frame*, const KURL&, bool isXHTML, bool isHTML);
 
     void clearXMLVersion() { m_xmlVersion = String(); }
-
 
 private:
     friend class IgnoreDestructiveWriteCountIncrementer;
@@ -1376,6 +1379,8 @@ private:
     
     RefPtr<EventQueue> m_eventQueue;
 
+    NodeRareData* m_documentRareData;
+
 #if ENABLE(WML)
     bool m_containsWMLContent;
 #endif
@@ -1429,8 +1434,13 @@ inline Node::Node(Document* document, ConstructionType type)
     : m_document(document)
     , m_previous(0)
     , m_next(0)
+#if ENABLE(PLD_DOM_TRAVERSAL)
+    , m_prefetch(0)
+#endif
     , m_renderer(0)
     , m_nodeFlags(type)
+    , m_previousNode(0)
+    , m_nextNode(0)
 {
     if (m_document)
         m_document->guardRef();
