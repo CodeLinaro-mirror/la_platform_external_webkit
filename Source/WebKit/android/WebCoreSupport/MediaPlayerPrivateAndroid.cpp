@@ -33,6 +33,7 @@
 
 #include "BaseLayerAndroid.h"
 #include "GraphicsContext.h"
+#include "HTMLMediaElement.h"
 #include "Settings.h"
 #include "SkiaUtils.h"
 #include "TilesManager.h"
@@ -288,7 +289,8 @@ public:
 
         jstring jUrl = wtfStringToJstring(env, m_url);
         env->CallVoidMethod(m_glue->m_javaProxy, m_glue->m_play, jUrl,
-                            static_cast<jint>(m_currentTime * 1000.0f));
+                            static_cast<jint>(m_currentTime * 1000.0f),
+                            isFullscreen());
         env->DeleteLocalRef(jUrl);
 
         checkException(env);
@@ -427,14 +429,14 @@ public:
         m_glue = new JavaGlue;
         m_glue->m_getInstance = env->GetStaticMethodID(clazz, "getInstance", "(Landroid/webkit/WebViewCore;II)Landroid/webkit/HTML5VideoViewProxy;");
         m_glue->m_loadPoster = env->GetMethodID(clazz, "loadPoster", "(Ljava/lang/String;)V");
-        m_glue->m_play = env->GetMethodID(clazz, "play", "(Ljava/lang/String;I)V");
+        m_glue->m_play = env->GetMethodID(clazz, "play", "(Ljava/lang/String;IZ)V");
 
         m_glue->m_teardown = env->GetMethodID(clazz, "teardown", "()V");
         m_glue->m_seek = env->GetMethodID(clazz, "seek", "(I)V");
         m_glue->m_pause = env->GetMethodID(clazz, "pause", "()V");
         m_glue->m_setVolume = env->GetMethodID(clazz, "setVolume", "(F)V");
         m_glue->m_javaProxy = 0;
-        m_glue->m_loadVideo = env->GetMethodID(clazz, "loadVideo", "(Ljava/lang/String;)V");
+        m_glue->m_loadVideo = env->GetMethodID(clazz, "loadVideo", "(Ljava/lang/String;Z)V");
         m_glue->m_loadMetadata = env->GetMethodID(clazz, "loadMetadata", "(Ljava/lang/String;)V");
         m_glue->m_enterFullscreen = env->GetMethodID(clazz, "enterFullscreen", "(Ljava/lang/String;FFFF)V");
         m_glue->m_exitFullscreen = env->GetMethodID(clazz, "exitFullscreen", "(FFFF)V");
@@ -505,7 +507,7 @@ public:
             if (m_player->preload() == MediaPlayer::MetaData)
                 env->CallVoidMethod(m_glue->m_javaProxy, m_glue->m_loadMetadata, jUrl);
             else
-                env->CallVoidMethod(m_glue->m_javaProxy, m_glue->m_loadVideo, jUrl);
+                env->CallVoidMethod(m_glue->m_javaProxy, m_glue->m_loadVideo, jUrl, isFullscreen());
             m_isMediaLoaded = true;
             env->DeleteLocalRef(jUrl);
             checkException(env);
@@ -547,6 +549,15 @@ public:
                             screenRect.width(), screenRect.height());
 
         checkException(env);
+    }
+
+    bool isFullscreen() {
+        // Grab the client media element in order to check the fullscreen value.
+        // When switching video src in fullscreen mode, the webkit MediaPlayer is re-allocated
+        // and thus the new MediaPlayer has no indication if it should be in fullscreen mode
+        // or not without querying the associated media element.
+        HTMLMediaElement* element = static_cast<HTMLMediaElement*>(m_player->mediaPlayerClient());
+        return element->isFullscreen();
     }
 };
 
@@ -787,10 +798,8 @@ static bool SendSurfaceTexture(JNIEnv* env, jobject obj, jobject surfTex,
                                int textureName, int playerState, int pointer) {
     WebCore::MediaPlayerPrivate* player = 0;
     if (pointer) {
-        // Always save the playerState in MediaPlayerPrivate's video layer instance.
         player = reinterpret_cast<WebCore::MediaPlayerPrivate*>(pointer);
         VideoLayerAndroid* videoLayer = static_cast<VideoLayerAndroid*>(player->platformLayer());
-        videoLayer->setPlayerState(static_cast<PlayerState>(playerState));
         if (playerState == RELEASED) {
             TilesManager::instance()->videoLayerManager()->markTextureForRecycling(
                     videoLayer->uniqueId(), textureName);
@@ -801,6 +810,7 @@ static bool SendSurfaceTexture(JNIEnv* env, jobject obj, jobject surfTex,
             // can be called (i.e. when video playback is started in fullscreen mode)
             player->updateVideoLayerSize();
         }
+        TilesManager::instance()->videoLayerManager()->updatePlayerState(videoLayerId, static_cast<PlayerState>(playerState));
     }
 
     if (!surfTex)
@@ -820,7 +830,7 @@ static bool SendSurfaceTexture(JNIEnv* env, jobject obj, jobject surfTex,
         return false;
 
     // Set the SurfaceTexture to the layer we found
-    videoLayer->setSurfaceTexture(texture, textureName, static_cast<PlayerState>(playerState));
+    videoLayer->setSurfaceTexture(texture, textureName);
 
     if (player)
         videoLayer->registerVideoLayerObserver(player->getVideoLayerObserver());
