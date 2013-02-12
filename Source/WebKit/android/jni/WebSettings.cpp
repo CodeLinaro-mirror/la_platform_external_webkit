@@ -139,6 +139,7 @@ struct FieldIds {
 #if ENABLE(WEBGL)
         mWebGLEnabled = env->GetFieldID(clazz, "mWebGLEnabled", "Z");
 #endif
+        mWOFFEnabled = env->GetFieldID(clazz, "mWOFFEnabled", "Z");
 #if ENABLE(WEB_AUTOFILL)
         mAutoFillEnabled = env->GetFieldID(clazz, "mAutoFillEnabled", "Z");
         mAutoFillProfile = env->GetFieldID(clazz, "mAutoFillProfile", "Landroid/webkit/WebSettingsClassic$AutoFillProfile;");
@@ -205,6 +206,7 @@ struct FieldIds {
 #if ENABLE(WEBGL)
         ALOG_ASSERT(mWebGLEnabled, "Could not find field mWebGLEnabled");
 #endif
+        ALOG_ASSERT(mWOFFEnabled, "Could not find field mWOFFEnabled");
 
         jclass enumClass = env->FindClass("java/lang/Enum");
         ALOG_ASSERT(enumClass, "Could not find Enum class!");
@@ -259,6 +261,7 @@ struct FieldIds {
 #if ENABLE(WEBGL)
     jfieldID mWebGLEnabled;
 #endif
+    jfieldID mWOFFEnabled;
     // Ordinal() method and value field for enums
     jmethodID mOrdinal;
     jfieldID  mTextSizeValue;
@@ -603,6 +606,8 @@ public:
         s->setWebGLEnabled(flag);
 #endif
 
+        flag = env->GetBooleanField(obj, gFieldIds->mWOFFEnabled);
+        s->setWOFFEnabled(flag);
 #if ENABLE(WEB_AUTOFILL)
         flag = env->GetBooleanField(obj, gFieldIds->mAutoFillEnabled);
         // TODO: This updates the Settings WebCore side with the user's
