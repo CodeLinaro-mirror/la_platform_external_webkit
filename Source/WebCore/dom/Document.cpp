@@ -436,6 +436,9 @@ Document::Document(Frame* frame, const KURL& url, bool isXHTML, bool isHTML)
 #if ENABLE(WML)
     , m_containsWMLContent(false)
 #endif
+#if ENABLE(WEBGL) && PLATFORM(ANDROID)
+    , m_containsWebGLContent(false)
+#endif
     , m_weakReference(DocumentWeakReference::create(this))
     , m_idAttributeName(idAttr)
 #if ENABLE(FULLSCREEN_API)
@@ -5128,4 +5131,29 @@ DocumentLoader* Document::loader() const
     return loader;
 }
 
+#if ENABLE(WEBGL) && PLATFORM(ANDROID)
+void Document::suspendDocument()
+{
+    HashSet<Element*>::iterator end = m_documentSuspendCallbackElements.end();
+    for (HashSet<Element*>::iterator i = m_documentSuspendCallbackElements.begin(); i != end; ++i)
+        (*i)->documentWasSuspended();
+}
+
+void Document::resumeDocument()
+{
+    HashSet<Element*>::iterator end = m_documentSuspendCallbackElements.end();
+    for (HashSet<Element*>::iterator i = m_documentSuspendCallbackElements.begin(); i != end; ++i)
+        (*i)->documentWillResume();
+}
+
+void Document::registerForDocumentSuspendCallbacks(Element* e)
+{
+    m_documentSuspendCallbackElements.add(e);
+}
+
+void Document::unregisterForDocumentSuspendCallbacks(Element* e)
+{
+    m_documentSuspendCallbackElements.remove(e);
+}
+#endif
 } // namespace WebCore
