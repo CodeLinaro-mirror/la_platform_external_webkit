@@ -236,8 +236,6 @@ GraphicsContext3DInternal::GraphicsContext3DInternal(HTMLCanvasElement* canvas,
         extensions.append("GL_OES_texture_npot");
     if (strstr(ext, "GL_OES_packed_depth_stencil"))
         extensions.append(" GL_OES_packed_depth_stencil");
-    if (strstr(ext, "GL_OES_texture_float"))
-        extensions.append(" GL_OES_texture_float");
     m_extensions.set(new Extensions3DAndroid(extensions));
 
     // ANGLE initialization.
