@@ -42,6 +42,10 @@
 #include <wtf/PassOwnPtr.h>
 #include <wtf/text/StringHash.h>
 
+#if ENABLE(WEB_AUDIO)
+#include "AudioSourceProvider.h"
+#endif
+
 #if USE(ACCELERATED_COMPOSITING)
 #include "GraphicsLayer.h"
 #endif
@@ -307,6 +311,10 @@ public:
     unsigned videoDecodedByteCount() const;
 
     void setPrivateBrowsingMode(bool);
+
+#if ENABLE(WEB_AUDIO)
+    AudioSourceProvider* audioSourceProvider();
+#endif
 
 private:
     MediaPlayer(MediaPlayerClient*);
