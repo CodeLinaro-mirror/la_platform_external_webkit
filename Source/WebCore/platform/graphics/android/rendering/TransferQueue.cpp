@@ -283,7 +283,13 @@ void TransferQueue::setPendingDiscard()
 void TransferQueue::clearPureColorQueue()
 {
     for (unsigned int i = 0 ; i < m_pureColorTileQueue.size(); i++) {
-        SkSafeUnref(m_pureColorTileQueue[i].savedTilePainter);
+        if (m_pureColorTileQueue[i].savedTilePainter &&
+            m_pureColorTileQueue[i].savedTilePainter->type() == TilePainter::Image) {
+            ImageTexture* image = static_cast<ImageTexture*>(m_pureColorTileQueue[i].savedTilePainter);
+            ImagesManager::instance()->releaseImage(image->imageCRC());
+        } else {
+            SkSafeUnref(m_pureColorTileQueue[i].savedTilePainter);
+        }
         m_pureColorTileQueue[i].savedTilePainter = 0;
     }
     m_pureColorTileQueue.clear();
