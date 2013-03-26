@@ -28,9 +28,11 @@
 
 #include "GLUtils.h"
 #include "IntRect.h"
+#include "IntSize.h"
 #include <wtf/HashMap.h>
 #include <wtf/Vector.h>
 #include <utils/threads.h>
+#include "SkBitmapRef.h"
 
 #if USE(ACCELERATED_COMPOSITING)
 
@@ -61,12 +63,13 @@ static const size_t surfaceMatrixSize = 4 * 4;
 // info globally.
 struct VideoLayerInfo {
     GLuint textureId; // GL texture bound with the surface texture.
-    int videoSize; // The size of the video.
-    float aspectRatio; // The aspect ratio of the video.
+    IntSize videoSize; // The video size
     int timeStamp; // Used to decide which VideoLayerInfo is the oldest one.
     GLfloat surfaceMatrix[surfaceMatrixSize];
     bool matrixInitialized;
     bool canBeRecycled;
+    bool frameCapture;
+    SkRefPtr<SkBitmapRef> bitmapRef;
 
     double lastIconShownTime;
     IconState iconState;
@@ -84,7 +87,7 @@ public:
     // Register the texture when we got setSurfaceTexture call.
     void registerTexture(const int layerId, const GLuint textureId);
     // Update the size when the video is prepared.
-    void updateVideoLayerSize(const int layerId, const int size, const float ratio);
+    void updateVideoLayerSize(const int layerId, const int width, const int height);
     // At draw time, update the matrix for every video frame update.
     void updateMatrix(const int layerId, const GLfloat* matrix);
     // Set the player state
@@ -102,6 +105,12 @@ public:
     float getAspectRatio(const int layerId);
     // Return the player state
     PlayerState getPlayerState(const int layerId);
+    IntSize getVideoNaturalSize(const int layerId);
+    void requestFrameCapture(const int layerId);
+    bool serviceFrameCapture(const int layerId);
+
+    void pushBitmap(const int layerId, SkBitmapRef* bitmap);
+    SkBitmapRef* popBitmap(const int layerId);
 
     // Delete the GL textures
     void deleteUnusedTextures();
