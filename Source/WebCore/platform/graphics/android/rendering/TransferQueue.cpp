@@ -514,6 +514,7 @@ void TransferQueue::addItemInTransferQueue(const TileRenderInfo* renderInfo,
 void TransferQueue::setTextureUploadType(TextureUploadType type)
 {
     android::Mutex::Autolock lock(m_transferQueueItemLocks);
+    type = CpuUpload;
     if (m_currentUploadType == type)
         return;
 
