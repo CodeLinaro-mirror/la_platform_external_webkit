@@ -553,6 +553,7 @@ SkBitmap* TransferQueue::getQueueBitmap()
 void TransferQueue::setTextureUploadType(TextureUploadType type)
 {
     android::Mutex::Autolock lock(m_transferQueueItemLocks);
+    type = CpuUpload;
     if (m_currentUploadType == type)
         return;
 
