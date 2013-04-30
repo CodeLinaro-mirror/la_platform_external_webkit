@@ -1,5 +1,6 @@
 /*
  * Copyright (C) 2010, Google Inc. All rights reserved.
+ * Copyright (c) 2012, The Linux Foundation. All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions
@@ -114,30 +115,31 @@ AudioNodeOutput* AudioNode::output(unsigned i)
     return 0;
 }
 
-void AudioNode::connect(AudioNode* destination, unsigned outputIndex, unsigned inputIndex, ExceptionCode& ec)
+bool AudioNode::connect(AudioNode* destination, unsigned outputIndex, unsigned inputIndex)
 {
     ASSERT(isMainThread());
+    ExceptionCode ec;
     AudioContext::AutoLocker locker(context());
 
     if (!destination) {
         ec = SYNTAX_ERR;
-        return;
+        return false;
     }
 
     // Sanity check input and output indices.
     if (outputIndex >= numberOfOutputs()) {
         ec = INDEX_SIZE_ERR;
-        return;
+        return false;
     }
 
     if (destination && inputIndex >= destination->numberOfInputs()) {
         ec = INDEX_SIZE_ERR;
-        return;
+        return false;
     }
 
     if (context() != destination->context()) {
         ec = SYNTAX_ERR;
-        return;
+        return false;
     }
 
     AudioNodeInput* input = destination->input(inputIndex);
@@ -146,21 +148,24 @@ void AudioNode::connect(AudioNode* destination, unsigned outputIndex, unsigned i
 
     // Let context know that a connection has been made.
     context()->incrementConnectionCount();
+    return true;
 }
 
-void AudioNode::disconnect(unsigned outputIndex, ExceptionCode& ec)
+bool AudioNode::disconnect(unsigned outputIndex)
 {
     ASSERT(isMainThread());
+    ExceptionCode ec;
     AudioContext::AutoLocker locker(context());
 
     // Sanity check input and output indices.
     if (outputIndex >= numberOfOutputs()) {
         ec = INDEX_SIZE_ERR;
-        return;
+        return  false;
     }
 
     AudioNodeOutput* output = this->output(outputIndex);
     output->disconnectAllInputs();
+    return true;
 }
 
 void AudioNode::processIfNecessary(size_t framesToProcess)
@@ -206,13 +211,34 @@ void AudioNode::ref(RefType refType)
 {
     switch (refType) {
     case RefTypeNormal:
-        atomicIncrement(&m_normalRefCount);
+        {
+#if USE(LOCKFREE_THREADSAFEREFCOUNTED)
+            atomicIncrement(&m_normalRefCount);
+#else
+            MutexLocker locker(m_mutex);
+            ++m_normalRefCount;
+#endif
+        }
         break;
     case RefTypeConnection:
-        atomicIncrement(&m_connectionRefCount);
+        {
+#if USE(LOCKFREE_THREADSAFEREFCOUNTED)
+            atomicIncrement(&m_connectionRefCount);
+#else
+            MutexLocker locker(m_mutex);
+            ++m_connectionRefCount;
+#endif
+        }
         break;
     case RefTypeDisabled:
-        atomicIncrement(&m_disabledRefCount);
+        {
+#if USE(LOCKFREE_THREADSAFEREFCOUNTED)
+            atomicIncrement(&m_disabledRefCount);
+#else
+            MutexLocker locker(m_mutex);
+            ++m_disabledRefCount;
+#endif
+        }
         break;
     default:
         ASSERT_NOT_REACHED();
@@ -275,16 +301,37 @@ void AudioNode::finishDeref(RefType refType)
 
     switch (refType) {
     case RefTypeNormal:
-        ASSERT(m_normalRefCount > 0);
-        atomicDecrement(&m_normalRefCount);
+        {
+            ASSERT(m_normalRefCount > 0);
+#if USE(LOCKFREE_THREADSAFEREFCOUNTED)
+            atomicDecrement(&m_normalRefCount);
+#else
+            MutexLocker locker(m_mutex);
+            --m_normalRefCount;
+#endif
+        }
         break;
     case RefTypeConnection:
-        ASSERT(m_connectionRefCount > 0);
-        atomicDecrement(&m_connectionRefCount);
+        {
+            ASSERT(m_connectionRefCount > 0);
+#if USE(LOCKFREE_THREADSAFEREFCOUNTED)
+            atomicDecrement(&m_connectionRefCount);
+#else
+            MutexLocker locker(m_mutex);
+            --m_connectionRefCount;
+#endif
+        }
         break;
     case RefTypeDisabled:
-        ASSERT(m_disabledRefCount > 0);
-        atomicDecrement(&m_disabledRefCount);
+        {
+            ASSERT(m_disabledRefCount > 0);
+#if USE(LOCKFREE_THREADSAFEREFCOUNTED)
+            atomicDecrement(&m_disabledRefCount);
+#else
+            MutexLocker locker(m_mutex);
+            --m_disabledRefCount;
+#endif
+        }
         break;
     default:
         ASSERT_NOT_REACHED();
