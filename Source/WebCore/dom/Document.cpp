@@ -4903,7 +4903,7 @@ void Document::webkitRequestFullScreenForElement(Element* element, unsigned shor
 
 void Document::webkitCancelFullScreen()
 {
-    if (!page() || !m_fullScreenElement)
+    if (!page() || !m_fullScreenElement || (m_fullScreenElement == documentElement()))
         return;
     
     page()->chrome()->client()->exitFullScreenForElement(m_fullScreenElement.get());
