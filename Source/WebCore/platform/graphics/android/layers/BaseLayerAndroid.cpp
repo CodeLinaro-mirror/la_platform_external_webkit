@@ -127,8 +127,45 @@ FixedBackgroundImageLayerAndroid::FixedBackgroundImageLayerAndroid(PassRefPtr<Re
     StyleImage* styleImage = layers->image();
     CachedImage* cachedImage = static_cast<StyleCachedImage*>(styleImage)->cachedImage();
     WebCore::Image* image = cachedImage->image();
+
+    if (style->backgroundRepeatX() != WebCore::NoRepeatFill
+                            && style->backgroundRepeatY() == WebCore::NoRepeatFill
+                            && (image->width() <= (TilesManager::tileWidth() / 2)))
+    {
+        SkBitmap device;
+        int width = TilesManager::tileWidth() - (TilesManager::tileWidth() % image->width());
+        device.setConfig(SkBitmap::kARGB_8888_Config, width, image->height());
+        if (device.allocPixels() == true) {
+            SkBitmapRef* img = image->nativeImageForCurrentFrame();
+            int x, y, copy_size = sizeof(uint32_t) * image->width();
+            uint32_t *src, *dest;
+            SkBitmap& orig_bitmap = img->bitmap();
+            orig_bitmap.lockPixels();
+            device.lockPixels();
+            for (y = 0; y < image->height(); y++) {
+                src = orig_bitmap.getAddr32(0, y);
+                for (x = 0; x < width; x += image->width()) {
+                    dest = device.getAddr32(x, y);
+                    memcpy(dest, src, copy_size);
+                }
+            }
+
+            SkBitmapRef bitmapref(device);
+            setContentsImage(&bitmapref);
+            setSize(width, image->height());
+            orig_bitmap.unlockPixels();
+            device.unlockPixels();
+            device.reset();
+        }
+        else {
     setContentsImage(image->nativeImageForCurrentFrame());
     setSize(image->width(), image->height());
+        }
+    }
+    else {
+        setContentsImage(image->nativeImageForCurrentFrame());
+        setSize(image->width(), image->height());
+    }
 
     setIntrinsicallyComposited(true);
 
