@@ -127,6 +127,8 @@ android::Surface* CanvasTexture::nativeWindow()
 bool CanvasTexture::uploadImageBuffer(ImageBuffer* imageBuffer)
 {
     m_hasValidTexture = false;
+    if (!imageBuffer)
+        return false;
     android::Surface* anw = nativeWindow();
     if (!anw)
         return false;
