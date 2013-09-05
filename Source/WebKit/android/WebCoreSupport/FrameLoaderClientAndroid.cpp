@@ -804,6 +804,10 @@ bool FrameLoaderClientAndroid::canShowMIMEType(const String& mimeType) const {
     if (mimeType == "application/vnd.oma.dd+xml")
         return false;
 
+    // handle DASH streaming .mpd file externally
+    if (mimeType == "application/dash+xml")
+        return false;
+
     if (MIMETypeRegistry::isSupportedImageResourceMIMEType(mimeType) ||
             MIMETypeRegistry::isSupportedNonImageMIMEType(mimeType) ||
             MIMETypeRegistry::isSupportedJavaScriptMIMEType(mimeType) ||
