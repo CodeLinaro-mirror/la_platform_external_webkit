@@ -356,6 +356,8 @@ public:
             m_naturalSize = IntSize(poster->width(), poster->height());
             m_player->sizeChanged();
         }
+        m_readyState = MediaPlayer::HaveEnoughData;
+        m_player->readyStateChanged();
     }
 
     void onPrepared(int duration, int width, int height)
