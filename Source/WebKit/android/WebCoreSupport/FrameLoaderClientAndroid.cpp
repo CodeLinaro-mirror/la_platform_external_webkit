@@ -1,5 +1,7 @@
 /*
  * Copyright 2007, The Android Open Source Project
+ * Copyright (c) 2013, The Linux Foundation. All rights reserved.
+ * Not a Contribution.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions
@@ -803,6 +805,12 @@ bool FrameLoaderClientAndroid::canShowMIMEType(const String& mimeType) const {
     // oma download
     if (mimeType == "application/vnd.oma.dd+xml")
         return false;
+
+//DRM Changes --START
+    if (!strcmp(mimeType.utf8().data(), "application/vnd.oma.drm.rights+xml")) {
+        return false;
+    }
+//DRM Changes --END
 
     if (MIMETypeRegistry::isSupportedImageResourceMIMEType(mimeType) ||
             MIMETypeRegistry::isSupportedNonImageMIMEType(mimeType) ||
