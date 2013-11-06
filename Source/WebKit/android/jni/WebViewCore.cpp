@@ -179,6 +179,10 @@ FILE* gRenderTreeFile = 0;
 #endif
 
 #define FOREGROUND_TIMER_INTERVAL 0.004 // 4ms
+#if ENABLE(WML)
+#include "WMLNames.h"
+#include "WMLInputElement.h"
+#endif
 #define BACKGROUND_TIMER_INTERVAL 1.0 // 1s
 
 // How many ms to wait for the scroll to "settle" before we will consider doing
@@ -2292,8 +2296,14 @@ void WebViewCore::setSelection(int start, int end)
     bool isPasswordField = false;
     if (focus->isElementNode()) {
         WebCore::Element* element = static_cast<WebCore::Element*>(focus);
-        if (WebCore::InputElement* inputElement = element->toInputElement())
-            isPasswordField = static_cast<WebCore::HTMLInputElement*>(inputElement)->isPasswordField();
+        if (WebCore::InputElement* inputElement = element->toInputElement()) {
+            if (element->isHTMLElement())
+                isPasswordField = static_cast<WebCore::HTMLInputElement*>(inputElement)->isPasswordField();
+#if ENABLE(WML)
+            else if (element->isWMLElement())
+                isPasswordField = static_cast<WebCore::WMLInputElement*>(inputElement)->isPasswordField();
+#endif
+        }
     }
     // For password fields, this is done in the UI side via
     // bringPointIntoView, since the UI does the drawing.
@@ -3409,6 +3419,15 @@ WebViewCore::InputType WebViewCore::getInputType(Node* node)
     if (node->isContentEditable())
         return WebViewCore::TEXT_AREA;
 
+#if ENABLE(WML)
+    if (node->hasTagName(WebCore::WMLNames::inputTag)) {
+        WMLInputElement* htmlInput = static_cast<WMLInputElement*>(node);
+        if (htmlInput->isPasswordField())
+            return WebViewCore::PASSWORD;
+        if (htmlInput->isTextField())
+            return WebViewCore::NORMAL_TEXT_FIELD;
+    }
+#endif
     return WebViewCore::NONE;
 }
 
@@ -3419,6 +3438,13 @@ int WebViewCore::getMaxLength(Node* node)
         HTMLInputElement* htmlInput = static_cast<HTMLInputElement*>(node);
         maxLength = htmlInput->maxLength();
     }
+
+#if ENABLE(WML)
+    else if (node->hasTagName(WebCore::WMLNames::inputTag)) {
+        WMLInputElement* wmlInput = static_cast<WMLInputElement*>(node);
+        maxLength = wmlInput->maxLength();
+    }
+#endif
     return maxLength;
 }
 
@@ -3429,6 +3455,13 @@ String WebViewCore::getFieldName(Node* node)
         HTMLInputElement* htmlInput = static_cast<HTMLInputElement*>(node);
         name = htmlInput->name();
     }
+
+#if ENABLE(WML)
+    else if (node->hasTagName(WebCore::WMLNames::inputTag)) {
+        WMLInputElement* wmlInput = static_cast<WMLInputElement*>(node);
+        name = wmlInput->formControlName();
+    }
+#endif
     return name;
 }
 
@@ -3597,6 +3630,7 @@ void WebViewCore::initializeTextInput(WebCore::Node* node, bool fake)
                         EditorClientAndroid* androidEditor =
                                 static_cast<EditorClientAndroid*>(editorClient);
                         WebAutofill* autoFill = androidEditor->getAutofill();
+                    if (node->document()->isHTMLDocument())
                         autoFill->formFieldFocused(inputElement);
                     }
 #endif

@@ -1701,14 +1701,19 @@ static jboolean HasPasswordField(JNIEnv *env, jobject obj)
     // class, but just normal Element class.
     while (node && !found && !node->namespaceURI().isNull() &&
            !node->namespaceURI().isEmpty()) {
-        const WTF::Vector<WebCore::FormAssociatedElement*>& elements =
-            ((WebCore::HTMLFormElement*)node)->associatedElements();
-        size_t size = elements.size();
-        for (size_t i = 0; i< size && !found; i++) {
-            WebCore::HTMLElement* e = toHTMLElement(elements[i]);
-            if (e->hasLocalName(WebCore::HTMLNames::inputTag)) {
-                if (static_cast<WebCore::HTMLInputElement*>(e)->isPasswordField())
-                    found = true;
+#if ENABLE(WML)
+        if(!node->isWMLElement())
+#endif
+        {
+            const WTF::Vector<WebCore::FormAssociatedElement*>& elements =
+                ((WebCore::HTMLFormElement*)node)->associatedElements();
+            size_t size = elements.size();
+            for (size_t i = 0; i< size && !found; i++) {
+                WebCore::HTMLElement* e = toHTMLElement(elements[i]);
+                if (e->hasLocalName(WebCore::HTMLNames::inputTag)) {
+                    if (static_cast<WebCore::HTMLInputElement*>(e)->isPasswordField())
+                        found = true;
+                }
             }
         }
         node = form->nextItem();
