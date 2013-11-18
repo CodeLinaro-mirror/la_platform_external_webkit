@@ -84,7 +84,6 @@ void WMLInputElement::dispatchBlurEvent()
     // Firstly check if it is allowed to leave this input field
     String val = value();
     if ((!m_isEmptyOk && val.isEmpty()) || !isConformedToInputMask(val)) {
-        updateFocusAppearance(true);
         return;
     }
 
@@ -273,6 +272,11 @@ void WMLInputElement::reset()
 
 void WMLInputElement::defaultEventHandler(Event* evt)
 {
+    if (evt->type() == eventNames().webkitEditableContentChangedEvent && renderer() && renderer()->isTextControl()) {
+        toRenderTextControl(renderer())->subtreeHasChanged();
+        return;
+    }
+
     bool clickDefaultFormButton = false;
 
     if (evt->type() == eventNames().textInputEvent && evt->isTextEvent()) {
@@ -517,6 +521,16 @@ unsigned WMLInputElement::cursorPositionToMaskIndex(unsigned cursorPosition)
     } while (cursorPosition--);
  
     return index;
+}
+
+int WMLInputElement::maxLength() const
+{
+    return m_data.maxLength();
+}
+
+const AtomicString& WMLInputElement::name() const
+{
+    return m_data.name();
 }
 
 }
