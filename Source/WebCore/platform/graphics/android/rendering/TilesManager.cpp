@@ -57,7 +57,7 @@
 // number to cap the layer tile texturs, it worked on both phones and tablets.
 // TODO: after merge the pool of base tiles and layer tiles, we should revisit
 // the logic of allocation management.
-#define MAX_TEXTURE_ALLOCATION ((10+TILE_PREFETCH_DISTANCE*2)*(7+TILE_PREFETCH_DISTANCE*2)*4)
+#define MAX_TEXTURE_ALLOCATION ((10+TILE_PREFETCH_DISTANCE*2)*(7+TILE_PREFETCH_DISTANCE*2)*2)
 #define TILE_WIDTH 256
 #define TILE_HEIGHT 256
 
