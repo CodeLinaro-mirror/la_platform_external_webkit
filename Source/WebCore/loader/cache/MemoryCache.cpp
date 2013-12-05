@@ -46,7 +46,7 @@ using namespace std;
 
 namespace WebCore {
 
-static const int cDefaultCacheCapacity = 8192 * 1024;
+static const int cDefaultCacheCapacity = 4 * 1024 * 1024;
 static const double cMinDelayBeforeLiveDecodedPrune = 1; // Seconds.
 static const float cTargetPrunePercentage = .95f; // Percentage of capacity toward which we prune, to avoid immediately pruning again.
 static const double cDefaultDecodedDataDeletionInterval = 0;
