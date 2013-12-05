@@ -406,7 +406,9 @@ CachedResource* CachedResourceLoader::requestResource(CachedResource::Type type,
             //simulate CachedResourceRequest::didReceiveData
             RefPtr<SharedBuffer> copiedData = SharedBuffer::create(data, size);
             resource->data(copiedData.release(), true);
-            if (resource->inCache()) {
+            //try to re-get resource from mem cache since it could have been deleted by resource->data()
+            resource = memoryCache()->resourceForURL(url);
+            if (resource) {
                 StatHubReleasePreloaded(url.string().latin1().data());
                 StatHubStartLoadResource(this, resource->url(), priority, forPreload, false);
                 resource->finish();
@@ -414,12 +416,6 @@ CachedResource* CachedResourceLoader::requestResource(CachedResource::Type type,
                 notifyLoadedFromMemoryCache(resource);
                 m_documentResources.set(resource->url(), resource);
                 return resource;
-            }
-            else {
-                if (resource->canDelete()) {
-                    delete resource;
-                    resource = NULL;
-                }
             }
         }
 
