@@ -127,6 +127,16 @@ void WMLDoElement::insertedIntoDocument()
 
     if (WMLEventHandlingElement* eventHandlingElement = toWMLEventHandlingElement(static_cast<WMLElement*>(parent)))
         eventHandlingElement->registerDoElement(this, document());
+    else if (parent->hasTagName(pTag)){
+        parent = parent->parentNode();
+        while(parent) {
+            if (WMLEventHandlingElement* eventHandlingElement = toWMLEventHandlingElement(static_cast<WMLElement*>(parent))) {
+                eventHandlingElement->registerDoElement(this, document());
+                return;
+            }
+            parent = parent->parentNode();
+        }
+    }
 }
 
 void WMLDoElement::removedFromDocument()
