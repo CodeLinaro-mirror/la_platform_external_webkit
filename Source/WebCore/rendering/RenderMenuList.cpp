@@ -198,6 +198,46 @@ void RenderMenuList::setTextFromOption(int optionIndex)
         }
     }
 
+    // decide which option items in select element should be shown to user.
+    int sizeShown = min(select->size(), size);
+    if (sizeShown < 2) {
+        setText(text.stripWhiteSpace());
+        return;
+    }
+    if (i <= 0) {
+        text = "";
+        for (int j = 0; j < sizeShown; j++) {
+            Element* element = listItems[j];
+            if (OptionElement* optionElement = toOptionElement(element)) {
+                text = text + "\n" + optionElement->textIndentedToRespectGroupLabel();
+            }
+        }
+    } else if (i == size - 1) {
+        text = "";
+        for (int j = size - 1; j > size - sizeShown - 1; j--) {
+            Element* element = listItems[j];
+            if (OptionElement* optionElement = toOptionElement(element)) {
+                text = optionElement->textIndentedToRespectGroupLabel() + "\n" + text;
+            }
+        }
+    } else if (i > 0 && i < size - 1) {
+        text = "";
+        int begin = 0, end = 0;
+        if (size == sizeShown) {
+            begin = 0;
+            end = size;
+        } else {
+            begin = max(i - (sizeShown - 1) / 2, 0);
+            end = sizeShown + begin;
+        }
+        for (int j = begin; j < end; j++) {
+            Element* element = listItems[j];
+            if (OptionElement* optionElement = toOptionElement(element)) {
+                text = text + "\n" + optionElement->textIndentedToRespectGroupLabel();
+            }
+        }
+    }
+
     setText(text.stripWhiteSpace());
 }
 
