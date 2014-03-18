@@ -45,6 +45,9 @@
 #include "SkCanvas.h"
 #include "UserAgentStyleSheets.h"
 #include "WebCoreFrameBridge.h"
+#include <math.h>
+
+using namespace std;
 
 namespace WebCore {
 
@@ -594,7 +597,19 @@ static void adjustMenuListStyleCommon(RenderStyle* style)
 
 void RenderThemeAndroid::adjustListboxStyle(CSSStyleSelector*, RenderStyle* style, Element* e) const
 {
-    adjustMenuListButtonStyle(0, style, 0);
+    SelectElement* select = toSelectElement(e);
+    const Vector<Element*>& listItems = select->listItems();
+    int size = listItems.size();
+    int sizeShown = min(size, select->size());
+    // adjust height for select element to hold not only one option
+    if (select && sizeShown > 1) {
+        int oldHeight = style->logicalHeight().isFixed() ? style->logicalHeight().value() : -1;
+        adjustMenuListButtonStyle(0, style, 0);
+        style->setHeight(Length(oldHeight > 0 ? oldHeight :
+                (style->fontSize() + listboxPadding) * sizeShown, Fixed));
+    } else {
+        adjustMenuListButtonStyle(0, style, 0);
+    }
 }
 
 void RenderThemeAndroid::adjustMenuListStyle(CSSStyleSelector*, RenderStyle* style, Element*) const
