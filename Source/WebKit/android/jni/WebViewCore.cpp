@@ -178,6 +178,10 @@ FILE* gRenderTreeFile = 0;
 #include "RenderLayerCompositor.h"
 #endif
 
+#if ENABLE(WML)
+#include "WMLInputElement.h"
+#endif
+
 #define FOREGROUND_TIMER_INTERVAL 0.004 // 4ms
 #define BACKGROUND_TIMER_INTERVAL 1.0 // 1s
 
@@ -2292,8 +2296,20 @@ void WebViewCore::setSelection(int start, int end)
     bool isPasswordField = false;
     if (focus->isElementNode()) {
         WebCore::Element* element = static_cast<WebCore::Element*>(focus);
-        if (WebCore::InputElement* inputElement = element->toInputElement())
-            isPasswordField = static_cast<WebCore::HTMLInputElement*>(inputElement)->isPasswordField();
+        if (WebCore::InputElement* inputElement = element->toInputElement()) {
+#if ENABLE(WML)
+            if (element->isHTMLElement())
+                isPasswordField = static_cast<WebCore::HTMLInputElement*>
+                        (inputElement)->isPasswordField();
+            else if (element->isWMLElement())
+                isPasswordField = static_cast<WebCore::WMLInputElement*>
+                        (inputElement)->isPasswordField();
+#else
+            if (element->isHTMLElement())
+                isPasswordField = static_cast<WebCore::HTMLInputElement*>
+                        (inputElement)->isPasswordField();
+#endif
+        }
     }
     // For password fields, this is done in the UI side via
     // bringPointIntoView, since the UI does the drawing.

@@ -44,6 +44,9 @@
 #include "Settings.h"
 #include "SimpleFontData.h"
 #include "TextControlInnerElements.h"
+#if ENABLE(WML)
+#include "WMLNames.h"
+#endif
 
 using namespace std;
 
@@ -700,6 +703,11 @@ void RenderTextControlSingleLine::updateFromElement()
             if (!static_cast<HTMLInputElement*>(node())->formControlValueMatchesRenderer())
                 setInnerTextValue(inputElement()->visibleValue());
         }
+#if ENABLE(WML)
+        if (node()->isWMLElement() && node()->hasTagName(WMLNames::inputTag)) {
+            setInnerTextValue(inputElement()->visibleValue());
+        }
+#endif
     }
 
     if (m_searchPopupIsVisible)
