@@ -311,7 +311,7 @@ namespace WebCore {
 
         virtual PassRefPtr<FrameNetworkingContext> createNetworkingContext() = 0;
 
-        virtual bool shouldPaintBrokenImage(const KURL&) const { return true; }
+        virtual bool shouldPaintBrokenImage(const KURL&) const { return false; }
     };
 
 } // namespace WebCore
