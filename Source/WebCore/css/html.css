@@ -840,6 +840,10 @@ a:-webkit-any-link:active {
     color: -webkit-activelink
 }
 
+a:focus {
+    outline: solid 5px -webkit-focus-ring-color
+}
+
 /* HTML5 ruby elements */
 
 ruby, rt {
